@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>LockLens</title><link rel="stylesheet" href="popup.css"></head>
+<body><main class="popup-shell" aria-labelledby="appTitle">
+<header class="brand"><div class="shield-mark" aria-hidden="true">L</div><div><p class="eyebrow">PRIVACY INTELLIGENCE</p><h1 id="appTitle">LockLens</h1></div></header><p class="tagline">Your Privacy, Under Your Control</p>
+<section class="privacy-box" aria-label="Privacy promise"><span class="privacy-icon" aria-hidden="true">🔒</span><div><strong>Local analysis</strong><span>No raw data is stored</span></div></section>
+<button id="scanButton" class="primary-button" type="button">Analyze This Page</button>
+<button id="privacyGuardButton" class="secondary-button guard-toggle" type="button" aria-pressed="false">Enable Privacy Guard</button>
+<p id="guardStatus" class="guard-status" role="status" aria-live="polite">Privacy Guard is currently off.</p>
+<button id="dashboardButton" class="secondary-button" type="button">Open Dashboard <span aria-hidden="true">→</span></button>
+<p id="status" class="status" role="status" aria-live="polite">Ready to analyze this page.</p><p class="device-note">Analysis happens locally on your device.</p>
+</main><script src="../scripts/scanner.js"></script><script src="../scripts/riskEngine.js"></script><script src="../scripts/timeline.js"></script><script src="popup.js"></script></body></html>

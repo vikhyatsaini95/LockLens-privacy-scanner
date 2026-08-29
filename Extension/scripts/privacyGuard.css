@@ -1,0 +1,39 @@
+#locklens-privacy-warning {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2147483647;
+    width: min(420px, calc(100vw - 40px));
+    padding: 16px;
+    border-radius: 14px;
+    background: #111827;
+    color: #ffffff;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    font-family: Arial, sans-serif;
+}
+
+.locklens-warning-content {
+    display: flex;
+    gap: 14px;
+    justify-content: space-between;
+}
+
+.locklens-warning-content p {
+    margin: 8px 0;
+    line-height: 1.4;
+}
+
+.locklens-warning-content small {
+    opacity: 0.8;
+}
+
+#locklens-dismiss-warning {
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 6px;
+    line-height: 1;
+    pointer-events: auto;
+}
