@@ -1,7 +1,847 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>LockLens | Privacy Dashboard</title><link rel="stylesheet" href="dashboard.css"></head>
-<body><div class="dashboard"><header class="topbar"><a class="brand" href="#top"><span class="shield">L</span><span><b>LockLens</b><small>PRIVACY INTELLIGENCE</small></span></a><span class="privacy-badge">🔒 Local Analysis · No Raw Data Stored</span></header>
-<main id="top"><section class="hero"><div><p class="eyebrow">DIGITAL FOOTPRINT INTELLIGENCE</p><h1>Your privacy, <em>in focus.</em></h1><p class="lead">Understand potential exposure without sharing your raw personal information.</p><div class="footprint-flow" aria-label="Privacy-safe analysis flow"><span>YOU</span><i>→</i><span>WEBPAGE</span><i>→</i><span>METADATA</span><i>→</i><span>RISK</span></div></div><div class="hero-visual"><div class="network-node node-one"></div><div class="network-node node-two"></div><div class="network-node node-three"></div><div class="radar"><span>LOCAL<br>SCAN</span></div></div><div class="risk-panel"><p>Current privacy risk</p><div class="risk-ring" id="riskRing"><strong id="score">0</strong><span>/100</span></div><div id="riskLevel" class="risk-level">Not analyzed</div></div></section>
-<section class="section-heading"><div><p class="eyebrow">CURRENT SCAN</p><h2>Exposure categories</h2></div><p>Only categories and counts are shown.</p></section><section id="findings" class="findings-grid" aria-live="polite"></section>
-<section class="privacy-guard-section"><div class="privacy-guard-card"><div class="guard-header"><div><h2>Privacy Guard</h2><p class="guard-status" id="dashboardGuardStatus">Status: Checking...</p></div><span class="guard-icon" aria-hidden="true">🛡️</span></div><div class="guard-content"><p class="guard-label">Latest page assessment:</p><div id="guardAssessment" class="guard-assessment">No page assessment available yet.</div><p class="guard-label">Categories requested:</p><ul id="guardCategories" class="guard-categories"><li>No categories detected yet.</li></ul></div><div class="guard-privacy-note">✓ No typed values collected or stored</div></div></section>
-<section class="content-grid"><article class="panel timeline"><div class="section-heading"><div><p class="eyebrow">PERSONAL EXPOSURE TIMELINE</p><h2>Your digital footprint over time</h2></div><span id="timelineStatus" class="timeline-status">Low exposure</span></div><div class="stats"><div><strong id="pagesAnalyzed">0</strong><span>Pages analyzed today</span></div><div><strong id="categoriesDetected">0</strong><span>Categories detected</span></div><div><strong id="highRiskInteractions">0</strong><span>High-risk interactions</span></div></div><h3>Recent privacy activity</h3><div id="timelineHistory" class="history" aria-live="polite"></div></article><aside class="panel recommendations"><p class="eyebrow">NEXT STEPS</p><h2>Privacy recommendations</h2><ul id="recommendations"></ul></aside></section></main><footer>Your raw personal information never leaves your browser.</footer></div><script src="dashboard.js"></script></body></html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="description"
+        content="LockLens Privacy Intelligence Dashboard"
+    >
+
+    <title>
+        LockLens | Privacy Command Center
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="dashboard.css"
+    >
+
+</head>
+
+
+<body>
+
+<div class="dashboard">
+
+    <!-- =====================================================
+         TOP BAR
+         ===================================================== -->
+
+    <header class="topbar">
+
+        <a
+            class="brand"
+            href="#top"
+        >
+
+            <span class="shield">
+                L
+            </span>
+
+            <span class="brand-text">
+
+                <strong>
+                    LockLens
+                </strong>
+
+                <small>
+                    PRIVACY INTELLIGENCE
+                </small>
+
+            </span>
+
+        </a>
+
+
+        <div class="topbar-actions">
+
+            <span
+                class="privacy-badge"
+            >
+                🔒 Local Analysis
+            </span>
+
+            <button
+                id="clearDataButton"
+                class="clear-button"
+                type="button"
+            >
+                Clear Local Data
+            </button>
+
+        </div>
+
+    </header>
+
+
+    <main id="top">
+
+
+        <!-- =================================================
+             HERO
+             ================================================= -->
+
+        <section class="hero">
+
+            <div class="hero-copy">
+
+                <p class="eyebrow">
+                    PRIVACY COMMAND CENTER
+                </p>
+
+                <h1>
+                    Your privacy,
+                    <em>in focus.</em>
+                </h1>
+
+                <p class="lead">
+                    Understand what kinds of personal information
+                    websites appear to request, assess your exposure,
+                    and make more informed privacy decisions.
+                </p>
+
+
+                <div class="privacy-principles">
+
+                    <span>
+                        ✓ Local processing
+                    </span>
+
+                    <span>
+                        ✓ No raw values
+                    </span>
+
+                    <span>
+                        ✓ Explainable scoring
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <!-- =================================================
+                 RISK PANEL
+                 ================================================= -->
+
+            <div class="risk-panel">
+
+                <div class="risk-panel-header">
+
+                    <span>
+                        CURRENT PRIVACY RISK
+                    </span>
+
+                    <span
+                        id="lastScan"
+                        class="last-scan"
+                    >
+                        No scan yet
+                    </span>
+
+                </div>
+
+
+                <div
+                    id="riskRing"
+                    class="risk-ring"
+                    aria-label="Privacy risk score"
+                >
+
+                    <div class="risk-ring-content">
+
+                        <strong id="score">
+                            0
+                        </strong>
+
+                        <span>
+                            /100
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="riskLevel"
+                    class="risk-level"
+                >
+                    Not analyzed
+                </div>
+
+
+                <p
+                    id="riskExplanation"
+                    class="risk-explanation"
+                >
+                    Run a LockLens scan to calculate your
+                    privacy exposure score.
+                </p>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             QUICK STATS
+             ================================================= -->
+
+        <section class="quick-stats">
+
+            <div class="quick-stat">
+
+                <span class="stat-icon">
+                    🔎
+                </span>
+
+                <div>
+
+                    <strong id="totalEvents">
+                        0
+                    </strong>
+
+                    <span>
+                        Exposure events
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <div class="quick-stat">
+
+                <span class="stat-icon">
+                    🧩
+                </span>
+
+                <div>
+
+                    <strong id="uniqueCategories">
+                        0
+                    </strong>
+
+                    <span>
+                        Categories detected
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <div class="quick-stat">
+
+                <span class="stat-icon">
+                    ⚠️
+                </span>
+
+                <div>
+
+                    <strong id="highRiskEvents">
+                        0
+                    </strong>
+
+                    <span>
+                        High-risk events
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <div class="quick-stat">
+
+                <span class="stat-icon">
+                    📈
+                </span>
+
+                <div>
+
+                    <strong id="averageRisk">
+                        0
+                    </strong>
+
+                    <span>
+                        Average risk
+                    </span>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             CURRENT EXPOSURE
+             ================================================= -->
+
+        <section class="section-block">
+
+            <div class="section-heading">
+
+                <div>
+
+                    <p class="eyebrow">
+                        CURRENT SCAN
+                    </p>
+
+                    <h2>
+                        Exposure categories
+                    </h2>
+
+                </div>
+
+                <p>
+                    Categories only — never raw values.
+                </p>
+
+            </div>
+
+
+            <div
+                id="findings"
+                class="findings-grid"
+                aria-live="polite"
+            >
+
+                <div class="empty">
+                    No scan available yet.
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             PRIVACY GUARD
+             ================================================= -->
+
+        <section class="privacy-guard-section">
+
+            <div class="guard-card">
+
+                <div class="guard-header">
+
+                    <div>
+
+                        <p class="eyebrow">
+                            PROACTIVE PROTECTION
+                        </p>
+
+                        <h2>
+                            Privacy Guard
+                        </h2>
+
+                        <p
+                            id="dashboardGuardStatus"
+                            class="guard-status"
+                        >
+                            Status: Checking...
+                        </p>
+
+                    </div>
+
+                    <div class="guard-icon">
+                        🛡️
+                    </div>
+
+                </div>
+
+
+                <div class="guard-grid">
+
+                    <div>
+
+                        <span class="guard-label">
+                            Latest assessment
+                        </span>
+
+                        <div
+                            id="guardAssessment"
+                            class="guard-assessment"
+                        >
+                            No assessment yet.
+                        </div>
+
+                    </div>
+
+
+                    <div>
+
+                        <span class="guard-label">
+                            Categories requested
+                        </span>
+
+                        <div
+                            id="guardCategories"
+                            class="guard-category-list"
+                        >
+                            <span class="muted">
+                                No categories detected.
+                            </span>
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="privacy-note">
+
+                    <span>
+                        ✓
+                    </span>
+
+                    <span>
+                        LockLens checks field structure and
+                        metadata only. Typed values and passwords
+                        are never collected.
+                    </span>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             ANALYTICS GRID
+             ================================================= -->
+
+        <section class="analytics-grid">
+
+
+            <!-- =============================================
+                 CATEGORY ANALYTICS
+                 ============================================= -->
+
+            <article class="panel">
+
+                <div class="panel-heading">
+
+                    <div>
+
+                        <p class="eyebrow">
+                            EXPOSURE ANALYTICS
+                        </p>
+
+                        <h2>
+                            Privacy signal distribution
+                        </h2>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="categoryChart"
+                    class="category-chart"
+                >
+
+                    <div class="empty">
+                        Exposure analytics will appear
+                        after your first scan.
+                    </div>
+
+                </div>
+
+            </article>
+
+
+            <!-- =============================================
+                 RISK OVERVIEW
+                 ============================================= -->
+
+            <article class="panel">
+
+                <div class="panel-heading">
+
+                    <div>
+
+                        <p class="eyebrow">
+                            RISK ANALYSIS
+                        </p>
+
+                        <h2>
+                            Exposure overview
+                        </h2>
+
+                    </div>
+
+                </div>
+
+
+                <div class="risk-overview">
+
+                    <div class="overview-row">
+
+                        <span>
+                            Average risk
+                        </span>
+
+                        <strong
+                            id="overviewAverage"
+                        >
+                            0/100
+                        </strong>
+
+                    </div>
+
+
+                    <div class="overview-row">
+
+                        <span>
+                            Highest recorded risk
+                        </span>
+
+                        <strong
+                            id="overviewHighest"
+                        >
+                            0/100
+                        </strong>
+
+                    </div>
+
+
+                    <div class="overview-row">
+
+                        <span>
+                            High-risk events
+                        </span>
+
+                        <strong
+                            id="overviewHigh"
+                        >
+                            0
+                        </strong>
+
+                    </div>
+
+
+                    <div class="overview-row">
+
+                        <span>
+                            Critical events
+                        </span>
+
+                        <strong
+                            id="overviewCritical"
+                        >
+                            0
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="riskMessage"
+                    class="risk-message"
+                >
+                    Start scanning pages to build your
+                    privacy exposure profile.
+                </div>
+
+            </article>
+
+        </section>
+
+
+        <!-- =================================================
+             TIMELINE + RECOMMENDATIONS
+             ================================================= -->
+
+        <section class="content-grid">
+
+
+            <!-- =============================================
+                 DIGITAL FOOTPRINT ACTIVITY
+                 ============================================= -->
+
+            <article class="panel timeline-panel">
+
+                <div class="section-heading">
+
+                    <div>
+
+                        <p class="eyebrow">
+                            DIGITAL FOOTPRINT ACTIVITY
+                        </p>
+
+                        <h2>
+                            Privacy activity over time
+                        </h2>
+
+                    </div>
+
+                    <span
+                        id="timelineStatus"
+                        class="timeline-status"
+                    >
+                        No activity
+                    </span>
+
+                </div>
+
+
+                <div class="timeline-summary">
+
+                    <div>
+
+                        <strong
+                            id="pagesAnalyzed"
+                        >
+                            0
+                        </strong>
+
+                        <span>
+                            Events today
+                        </span>
+
+                    </div>
+
+
+                    <div>
+
+                        <strong
+                            id="categoriesDetected"
+                        >
+                            0
+                        </strong>
+
+                        <span>
+                            Categories today
+                        </span>
+
+                    </div>
+
+
+                    <div>
+
+                        <strong
+                            id="highRiskInteractions"
+                        >
+                            0
+                        </strong>
+
+                        <span>
+                            High-risk today
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <div class="timeline-title">
+                    Recent privacy activity
+                </div>
+
+
+                <div
+                    id="timelineHistory"
+                    class="history"
+                    aria-live="polite"
+                >
+
+                    <div class="empty">
+                        No privacy activity recorded yet.
+                    </div>
+
+                </div>
+
+            </article>
+
+
+            <!-- =============================================
+                 RECOMMENDATIONS
+                 ============================================= -->
+
+            <aside class="panel recommendations-panel">
+
+                <div class="panel-heading">
+
+                    <div>
+
+                        <p class="eyebrow">
+                            SMART PRIVACY COACH
+                        </p>
+
+                        <h2>
+                            Recommendations
+                        </h2>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="recommendationSummary"
+                    class="recommendation-summary"
+                >
+                    Recommendations are generated from
+                    privacy categories and risk context.
+                </div>
+
+
+                <div
+                    id="recommendations"
+                    class="recommendation-list"
+                >
+
+                    <div class="empty">
+                        Analyze a page to receive
+                        privacy recommendations.
+                    </div>
+
+                </div>
+
+            </aside>
+
+        </section>
+
+
+        <!-- =================================================
+             PRIVACY ARCHITECTURE
+             ================================================= -->
+
+        <section class="privacy-architecture">
+
+            <div class="section-heading">
+
+                <div>
+
+                    <p class="eyebrow">
+                        PRIVACY BY DESIGN
+                    </p>
+
+                    <h2>
+                        What LockLens stores
+                    </h2>
+
+                </div>
+
+            </div>
+
+
+            <div class="architecture-grid">
+
+
+                <div class="architecture-card allowed">
+
+                    <span>
+                        ✓
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            Stored locally
+                        </strong>
+
+                        <p>
+                            Risk score, category names,
+                            timestamps and anonymous
+                            exposure metadata.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="architecture-card blocked">
+
+                    <span>
+                        ×
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            Never stored
+                        </strong>
+
+                        <p>
+                            Passwords, typed values,
+                            email addresses, phone numbers,
+                            URLs, domains and page content.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="architecture-card local">
+
+                    <span>
+                        ◎
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            Processing location
+                        </strong>
+
+                        <p>
+                            Core privacy analysis happens
+                            locally inside the browser.
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+    </main>
+
+
+    <!-- =====================================================
+         FOOTER
+         ===================================================== -->
+
+    <footer>
+
+        <span>
+            LockLens v2.0
+        </span>
+
+        <span>
+            Your Privacy. Under Your Control.
+        </span>
+
+    </footer>
+
+
+</div>
+
+
+<script src="dashboard.js"></script>
+
+</body>
+
+</html>

@@ -1,39 +1,561 @@
-#locklens-privacy-warning {
+/* ============================================================
+   LockLens Privacy Guard 2.0
+   File: scripts/privacyGuard.css
+   ============================================================ */
+
+
+/* ============================================================
+   OVERLAY
+   ============================================================ */
+
+.locklens-guard-overlay {
+
     position: fixed;
-    top: 20px;
-    right: 20px;
+
+    inset: 0;
+
     z-index: 2147483647;
-    width: min(420px, calc(100vw - 40px));
-    padding: 16px;
-    border-radius: 14px;
-    background: #111827;
-    color: #ffffff;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    font-family: Arial, sans-serif;
-}
 
-.locklens-warning-content {
     display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    padding: 20px;
+
+    background:
+        rgba(3, 7, 18, 0.82);
+
+    backdrop-filter:
+        blur(8px);
+
+    -webkit-backdrop-filter:
+        blur(8px);
+
+    animation:
+        locklensFadeIn
+        0.2s
+        ease-out;
+}
+
+
+/* ============================================================
+   CARD
+   ============================================================ */
+
+.locklens-guard-card {
+
+    width: min(
+        460px,
+        100%
+    );
+
+    max-height: 90vh;
+
+    overflow-y: auto;
+
+    padding: 28px;
+
+    border:
+        1px solid
+        rgba(100, 180, 255, 0.35);
+
+    border-radius: 20px;
+
+    background:
+        linear-gradient(
+            145deg,
+            #0b1220,
+            #111c30
+        );
+
+    color: #e8f1ff;
+
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
+
+    box-shadow:
+        0 25px 80px
+        rgba(0, 0, 0, 0.65);
+
+    animation:
+        locklensSlideUp
+        0.25s
+        ease-out;
+
+    box-sizing: border-box;
+}
+
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+
+.locklens-guard-header {
+
+    display: flex;
+
+    align-items: flex-start;
+
     gap: 14px;
-    justify-content: space-between;
+
+    margin-bottom: 20px;
 }
 
-.locklens-warning-content p {
-    margin: 8px 0;
-    line-height: 1.4;
+
+.locklens-guard-title-area {
+
+    flex: 1;
+
+    min-width: 0;
 }
 
-.locklens-warning-content small {
-    opacity: 0.8;
+
+.locklens-guard-icon {
+
+    width: 46px;
+
+    height: 46px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    flex-shrink: 0;
+
+    border-radius: 14px;
+
+    background:
+        rgba(70, 150, 255, 0.12);
+
+    border:
+        1px solid
+        rgba(100, 180, 255, 0.3);
+
+    font-size: 23px;
 }
 
-#locklens-dismiss-warning {
-    border: none;
-    background: transparent;
-    color: inherit;
+
+.locklens-guard-title {
+
     font-size: 20px;
-    cursor: pointer;
-    padding: 6px;
+
+    font-weight: 700;
+
+    line-height: 1.3;
+
+    margin-bottom: 4px;
+}
+
+
+.locklens-guard-subtitle {
+
+    font-size: 13px;
+
+    line-height: 1.5;
+
+    color:
+        rgba(232, 241, 255, 0.65);
+}
+
+
+/* ============================================================
+   CLOSE BUTTON
+   ============================================================ */
+
+.locklens-guard-close {
+
+    width: 34px;
+
+    height: 34px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    flex-shrink: 0;
+
+    border: none;
+
+    border-radius: 10px;
+
+    background:
+        rgba(255, 255, 255, 0.06);
+
+    color:
+        rgba(255, 255, 255, 0.7);
+
+    font-size: 25px;
+
     line-height: 1;
-    pointer-events: auto;
+
+    cursor: pointer;
+
+    transition:
+        background 0.2s ease,
+        color 0.2s ease;
+}
+
+
+.locklens-guard-close:hover {
+
+    background:
+        rgba(255, 255, 255, 0.12);
+
+    color: white;
+}
+
+
+/* ============================================================
+   RISK BADGE
+   ============================================================ */
+
+.locklens-guard-risk {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    padding: 7px 12px;
+
+    margin-bottom: 16px;
+
+    border-radius: 999px;
+
+    font-size: 12px;
+
+    font-weight: 700;
+
+    letter-spacing: 0.08em;
+
+    background:
+        rgba(255, 255, 255, 0.08);
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.12);
+}
+
+
+.risk-low {
+
+    color: #65e6a8;
+
+    background:
+        rgba(40, 200, 120, 0.1);
+
+    border-color:
+        rgba(40, 200, 120, 0.3);
+}
+
+
+.risk-moderate {
+
+    color: #ffd166;
+
+    background:
+        rgba(255, 190, 50, 0.1);
+
+    border-color:
+        rgba(255, 190, 50, 0.3);
+}
+
+
+.risk-high {
+
+    color: #ff9b72;
+
+    background:
+        rgba(255, 100, 60, 0.1);
+
+    border-color:
+        rgba(255, 100, 60, 0.3);
+}
+
+
+/* ============================================================
+   EXPLANATION
+   ============================================================ */
+
+.locklens-guard-explanation {
+
+    margin: 0 0 22px;
+
+    font-size: 14px;
+
+    line-height: 1.6;
+
+    color:
+        rgba(232, 241, 255, 0.78);
+}
+
+
+/* ============================================================
+   SECTION
+   ============================================================ */
+
+.locklens-guard-section {
+
+    margin-bottom: 20px;
+}
+
+
+.locklens-guard-section-title {
+
+    margin-bottom: 10px;
+
+    font-size: 12px;
+
+    font-weight: 700;
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.08em;
+
+    color:
+        rgba(232, 241, 255, 0.55);
+}
+
+
+/* ============================================================
+   CATEGORY BADGES
+   ============================================================ */
+
+.locklens-guard-categories {
+
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 8px;
+}
+
+
+.locklens-guard-category {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    padding: 8px 11px;
+
+    border-radius: 9px;
+
+    background:
+        rgba(80, 150, 255, 0.1);
+
+    border:
+        1px solid
+        rgba(100, 180, 255, 0.22);
+
+    color:
+        #d9e9ff;
+
+    font-size: 12px;
+
+    font-weight: 600;
+}
+
+
+/* ============================================================
+   PRIVACY BOX
+   ============================================================ */
+
+.locklens-guard-privacy {
+
+    margin-top: 4px;
+
+    margin-bottom: 20px;
+
+    padding: 15px;
+
+    border-radius: 13px;
+
+    background:
+        rgba(50, 210, 145, 0.07);
+
+    border:
+        1px solid
+        rgba(50, 210, 145, 0.2);
+}
+
+
+.locklens-guard-privacy strong {
+
+    display: block;
+
+    margin-bottom: 7px;
+
+    color:
+        #73e6b0;
+
+    font-size: 13px;
+}
+
+
+.locklens-guard-privacy p {
+
+    margin: 0;
+
+    color:
+        rgba(232, 241, 255, 0.68);
+
+    font-size: 12px;
+
+    line-height: 1.55;
+}
+
+
+/* ============================================================
+   ACTION BUTTON
+   ============================================================ */
+
+.locklens-guard-understand {
+
+    width: 100%;
+
+    padding: 12px 16px;
+
+    border: none;
+
+    border-radius: 11px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #2388e8,
+            #1768c4
+        );
+
+    color: white;
+
+    font-size: 14px;
+
+    font-weight: 700;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 8px 24px
+        rgba(20, 110, 220, 0.25);
+
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+
+.locklens-guard-understand:hover {
+
+    transform:
+        translateY(-1px);
+
+    box-shadow:
+        0 12px 30px
+        rgba(20, 110, 220, 0.35);
+}
+
+
+.locklens-guard-understand:active {
+
+    transform:
+        translateY(0);
+}
+
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+
+@keyframes locklensFadeIn {
+
+    from {
+
+        opacity: 0;
+
+    }
+
+    to {
+
+        opacity: 1;
+
+    }
+}
+
+
+@keyframes locklensSlideUp {
+
+    from {
+
+        opacity: 0;
+
+        transform:
+            translateY(18px)
+            scale(0.98);
+
+    }
+
+    to {
+
+        opacity: 1;
+
+        transform:
+            translateY(0)
+            scale(1);
+
+    }
+}
+
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 520px) {
+
+    .locklens-guard-overlay {
+
+        padding: 12px;
+
+    }
+
+
+    .locklens-guard-card {
+
+        padding: 22px;
+
+        border-radius: 16px;
+
+    }
+
+
+    .locklens-guard-title {
+
+        font-size: 18px;
+
+    }
+
+}
+
+
+/* ============================================================
+   REDUCED MOTION
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+
+    .locklens-guard-overlay,
+    .locklens-guard-card {
+
+        animation: none;
+
+    }
+
 }
