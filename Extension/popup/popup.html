@@ -1,12 +1,557 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>LockLens</title><link rel="stylesheet" href="popup.css"></head>
-<body><main class="popup-shell" aria-labelledby="appTitle">
-<div class="cyber-grid" aria-hidden="true"></div><div class="orb orb-one" aria-hidden="true"></div><div class="orb orb-two" aria-hidden="true"></div>
-<header class="brand"><div class="shield-mark" aria-hidden="true"><span>L</span></div><div><p class="eyebrow">PRIVACY INTELLIGENCE</p><h1 id="appTitle">LockLens</h1></div><span class="live-dot" title="Local protection online"></span></header><p class="tagline">Your digital footprint, in focus.</p>
-<section class="privacy-box" aria-label="Privacy promise"><span class="privacy-icon" aria-hidden="true">⌁</span><div><strong>Privacy-first analysis</strong><span>Local metadata only · no raw data stored</span></div><span class="secure-check" aria-hidden="true">✓</span></section>
-<section class="scan-readout" aria-label="Scanner status"><span class="readout-label">SCANNER</span><span id="scanState">READY</span><span class="scan-pulse" aria-hidden="true"></span></section>
-<button id="scanButton" class="primary-button" type="button"><span class="button-icon" aria-hidden="true">◉</span><span>Analyze This Page</span><span class="scan-lines" aria-hidden="true"></span></button>
-<button id="privacyGuardButton" class="secondary-button guard-toggle" type="button" aria-pressed="false"><span class="button-icon" aria-hidden="true">◈</span><span>Enable Privacy Guard</span></button><p id="guardStatus" class="guard-status" role="status" aria-live="polite">Privacy Guard is currently off.</p>
-<button id="dashboardButton" class="secondary-button dashboard-button" type="button"><span>Open Intelligence Center</span><span aria-hidden="true">→</span></button><p id="status" class="status" role="status" aria-live="polite">Ready to analyze this page.</p><p class="device-note">Analysis happens locally on your device.</p>
-</main><script src="../scripts/scanner.js"></script><script src="../scripts/riskEngine.js"></script><script src="../scripts/recommendationEngine.js"></script><script src="../scripts/timeline.js"></script><script src="popup.js"></script></body></html>
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>LockLens</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            width: 390px;
+            min-height: 560px;
+
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+
+            background:
+                radial-gradient(
+                    circle at top right,
+                    rgba(0, 255, 200, 0.10),
+                    transparent 35%
+                ),
+                #071018;
+
+            color: #eafcff;
+        }
+
+        .container {
+            padding: 18px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+
+            margin-bottom: 14px;
+        }
+
+        .logo {
+            font-size: 23px;
+            font-weight: 800;
+            letter-spacing: 1px;
+        }
+
+        .logo span {
+            color: #00e6b8;
+        }
+
+        .status-dot {
+            width: 9px;
+            height: 9px;
+
+            border-radius: 50%;
+
+            background: #00e6b8;
+
+            box-shadow:
+                0 0 12px #00e6b8;
+        }
+
+        .privacy-banner {
+            padding: 12px;
+
+            border: 1px solid
+                rgba(0, 230, 184, 0.25);
+
+            border-radius: 12px;
+
+            background:
+                rgba(0, 230, 184, 0.06);
+
+            color: #bceee4;
+
+            font-size: 12px;
+            line-height: 1.5;
+
+            margin-bottom: 14px;
+        }
+
+        .card {
+            background:
+                rgba(255, 255, 255, 0.035);
+
+            border: 1px solid
+                rgba(255, 255, 255, 0.08);
+
+            border-radius: 15px;
+
+            padding: 15px;
+
+            margin-bottom: 12px;
+        }
+
+        .card-title {
+            margin: 0 0 8px;
+
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        button {
+            width: 100%;
+
+            border: 0;
+
+            border-radius: 10px;
+
+            padding: 12px;
+
+            margin-top: 10px;
+
+            font-size: 13px;
+            font-weight: 700;
+
+            cursor: pointer;
+
+            transition: 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            opacity: 0.55;
+
+            cursor: not-allowed;
+
+            transform: none;
+        }
+
+        .primary-button {
+            background: #00e6b8;
+            color: #03120f;
+        }
+
+        .secondary-button,
+        .guard-button {
+            background: #13242d;
+
+            color: #eafcff;
+
+            border: 1px solid #25414c;
+        }
+
+        .guard-button.active {
+            border-color: #00e6b8;
+            color: #00e6b8;
+        }
+
+        .scanner-status {
+            display: flex;
+
+            justify-content: space-between;
+
+            font-size: 11px;
+
+            color: #8da5b0;
+        }
+
+        #scannerStatus {
+            color: #00e6b8;
+            font-weight: 700;
+        }
+
+        #status {
+            min-height: 18px;
+
+            margin-top: 12px;
+
+            color: #a9c0ca;
+
+            font-size: 11px;
+
+            line-height: 1.4;
+        }
+
+        /* --------------------------------
+           URL RISK
+        -------------------------------- */
+
+        #urlRiskPanel {
+            display: none;
+        }
+
+        .url-risk-header {
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+            margin-bottom: 12px;
+        }
+
+        .url-risk-title {
+            margin: 0;
+
+            font-size: 14px;
+        }
+
+        .url-risk-score {
+            font-size: 22px;
+
+            font-weight: 800;
+
+            color: #00e6b8;
+        }
+
+        .url-risk-level {
+            display: block;
+
+            margin-top: 3px;
+
+            font-size: 11px;
+
+            font-weight: 700;
+        }
+
+        .url-risk-level.low {
+            color: #00e6b8;
+        }
+
+        .url-risk-level.medium {
+            color: #ffd166;
+        }
+
+        .url-risk-level.high {
+            color: #ff9f43;
+        }
+
+        .url-risk-level.critical {
+            color: #ff5c5c;
+        }
+
+        .url-risk-level.unknown {
+            color: #8da5b0;
+        }
+
+        .url-risk-checks {
+            display: grid;
+
+            gap: 7px;
+        }
+
+        .url-check {
+            display: flex;
+
+            gap: 9px;
+
+            align-items: center;
+
+            padding: 9px;
+
+            border-radius: 9px;
+
+            background:
+                rgba(255, 255, 255, 0.025);
+
+            border:
+                1px solid
+                rgba(255, 255, 255, 0.06);
+        }
+
+        .url-check-icon {
+            width: 22px;
+            height: 22px;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            border-radius: 50%;
+
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .url-check.pass .url-check-icon {
+            color: #00e6b8;
+
+            background:
+                rgba(0, 230, 184, 0.10);
+        }
+
+        .url-check.warning .url-check-icon {
+            color: #ffd166;
+
+            background:
+                rgba(255, 209, 102, 0.10);
+        }
+
+        .url-check strong {
+            display: block;
+
+            font-size: 11px;
+        }
+
+        .url-check small {
+            display: block;
+
+            margin-top: 2px;
+
+            color: #8da5b0;
+
+            font-size: 9px;
+        }
+
+        .url-recommendation {
+            padding: 8px 10px;
+
+            margin-top: 5px;
+
+            border-left:
+                2px solid #00e6b8;
+
+            background:
+                rgba(0, 230, 184, 0.04);
+
+            color: #a9c0ca;
+
+            font-size: 10px;
+
+            line-height: 1.4;
+        }
+
+        /* --------------------------------
+           EXPLAINABLE RISK
+        -------------------------------- */
+
+        .explanation-summary {
+            color: #b9cbd1;
+
+            font-size: 11px;
+
+            line-height: 1.5;
+
+            margin-bottom: 12px;
+        }
+
+        .explanation-title {
+            margin:
+                10px 0 7px;
+
+            color: #00e6b8;
+
+            font-size: 10px;
+
+            font-weight: 800;
+
+            letter-spacing: 0.5px;
+        }
+
+        .explanation-item {
+            padding: 9px 10px;
+
+            margin-top: 6px;
+
+            border-radius: 8px;
+
+            background:
+                rgba(255, 255, 255, 0.025);
+
+            border-left:
+                2px solid #00e6b8;
+
+            color: #a9c0ca;
+
+            font-size: 10px;
+
+            line-height: 1.45;
+        }
+
+        .footer {
+            margin-top: 12px;
+
+            text-align: center;
+
+            color: #506873;
+
+            font-size: 9px;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<main class="container">
+
+    <header class="header">
+
+        <div class="logo">
+            Lock<span>Lens</span>
+        </div>
+
+        <div class="status-dot"></div>
+
+    </header>
+
+    <div class="privacy-banner">
+
+        🔐 <strong>Privacy by Design</strong><br>
+
+        LockLens analyzes page and form
+        structure locally. It does not store
+        typed passwords, personal values,
+        or the actual URL.
+
+    </div>
+
+    <section class="card">
+
+        <div class="scanner-status">
+
+            <span>
+                Scanner Status
+            </span>
+
+            <span id="scannerStatus">
+                Ready
+            </span>
+
+        </div>
+
+        <button
+            id="analyzePage"
+            class="primary-button"
+        >
+            🔍 Analyze This Page
+        </button>
+
+        <button
+            id="privacyGuardButton"
+            class="guard-button"
+        >
+            Privacy Guard: ON
+        </button>
+
+        <button
+            id="dashboardButton"
+            class="secondary-button"
+        >
+            📊 Open Dashboard
+        </button>
+
+        <div id="status">
+            Ready to analyze the current webpage.
+        </div>
+
+    </section>
+
+    <!-- URL RISK -->
+
+    <section
+        id="urlRiskPanel"
+        class="card"
+    >
+
+        <div class="url-risk-header">
+
+            <div>
+
+                <h2 class="url-risk-title">
+                    🌐 URL Risk Analysis
+                </h2>
+
+                <span
+                    id="urlRiskLevel"
+                    class="url-risk-level unknown"
+                >
+                    Not analyzed
+                </span>
+
+            </div>
+
+            <div
+                id="urlRiskScore"
+                class="url-risk-score"
+            >
+                —
+            </div>
+
+        </div>
+
+        <div
+            id="urlRiskChecks"
+            class="url-risk-checks"
+        ></div>
+
+        <div
+            id="urlRiskRecommendations"
+        ></div>
+
+    </section>
+
+    <!-- EXPLAINABLE RISK -->
+
+    <section
+        id="explanationPanel"
+        class="card"
+        style="display:none;"
+    >
+
+        <div class="card-title">
+            🧠 Why This Risk?
+        </div>
+
+        <div
+            id="explanationSummary"
+            class="explanation-summary"
+        ></div>
+
+        <div
+            id="explanationReasons"
+        ></div>
+
+        <div
+            id="explanationActions"
+        ></div>
+
+    </section>
+
+    <div class="footer">
+        LockLens • Local Privacy & Exposure Protection
+    </div>
+
+</main>
+
+<script src="scripts/scanner.js"></script>
+<script src="scripts/riskEngine.js"></script>
+<script src="scripts/recommendationEngine.js"></script>
+<script src="scripts/timeline.js"></script>
+<script src="scripts/urlRiskInspector.js"></script>
+<script src="scripts/explanationEngine.js"></script>
+<script src="popup.js"></script>
+
+</body>
+
+</html>

@@ -1,543 +1,1226 @@
-// ============================================================
-// LockLens - Popup Controller 2.0
-// ============================================================
-//
-// Responsibilities:
-// 1. Scan the active webpage
-// 2. Run the LockLens scanner
-// 3. Calculate privacy risk
-// 4. Save results locally
-// 5. Record anonymous exposure timeline data
-// 6. Control Privacy Guard
-// 7. Open Dashboard
-//
-// Privacy:
-// - No typed values are collected
-// - No passwords are collected
-// - No URLs/domains are stored in timeline
-// - No raw personal data is sent to backend
-// ============================================================
+(() => {
+    "use strict";
 
+    const RESTRICTED_PROTOCOLS = [
+        "chrome:",
+        "edge:",
+        "about:",
+        "chrome-extension:",
+        "brave:"
+    ];
 
-document.addEventListener("DOMContentLoaded", () => {
+    const elements = {
+        analyzeButton:
+            document.getElementById("analyzePage"),
 
-    // ========================================================
-    // DOM ELEMENTS
-    // ========================================================
+        privacyGuardButton:
+            document.getElementById("privacyGuardButton"),
 
-    const scanButton =
-        document.getElementById("scanButton");
+        dashboardButton:
+            document.getElementById("dashboardButton"),
 
-    const dashboardButton =
-        document.getElementById("dashboardButton");
+        status:
+            document.getElementById("status"),
 
-    const privacyGuardButton =
-        document.getElementById("privacyGuardButton");
+        scannerStatus:
+            document.getElementById("scannerStatus"),
 
-    const guardStatus =
-        document.getElementById("guardStatus");
+        urlPanel:
+            document.getElementById("urlRiskPanel"),
 
-    const status =
-        document.getElementById("status");
+        urlScore:
+            document.getElementById("urlRiskScore"),
 
+        urlLevel:
+            document.getElementById("urlRiskLevel"),
 
-    // ========================================================
-    // BASIC STATUS FUNCTION
-    // ========================================================
+        urlChecks:
+            document.getElementById("urlRiskChecks"),
 
-    function setStatus(message, className = "") {
+        urlRecommendations:
+            document.getElementById(
+                "urlRiskRecommendations"
+            ),
 
-        if (!status) {
+        explanationPanel:
+            document.getElementById(
+                "explanationPanel"
+            ),
+
+        explanationSummary:
+            document.getElementById(
+                "explanationSummary"
+            ),
+
+        explanationReasons:
+            document.getElementById(
+                "explanationReasons"
+            ),
+
+        explanationActions:
+            document.getElementById(
+                "explanationActions"
+            )
+    };
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        init
+    );
+
+    async function init() {
+        try {
+            await loadPrivacyGuardState();
+            await loadPreviousResults();
+
+            if (elements.analyzeButton) {
+                elements.analyzeButton.addEventListener(
+                    "click",
+                    analyzeCurrentPage
+                );
+            }
+
+            if (elements.privacyGuardButton) {
+                elements.privacyGuardButton.addEventListener(
+                    "click",
+                    togglePrivacyGuard
+                );
+            }
+
+            if (elements.dashboardButton) {
+                elements.dashboardButton.addEventListener(
+                    "click",
+                    openDashboard
+                );
+            }
+
+            setScannerStatus("Ready");
+        } catch (error) {
+            console.error(
+                "LockLens initialization error:",
+                error
+            );
+
+            setStatus(
+                "Initialization error."
+            );
+        }
+    }
+
+    // =====================================================
+    // ACTIVE TAB
+    // =====================================================
+
+    async function getActiveTab() {
+        const tabs =
+            await chrome.tabs.query({
+                active: true,
+                currentWindow: true
+            });
+
+        return tabs[0];
+    }
+
+    function isRestrictedPage(url) {
+        if (!url) {
+            return true;
+        }
+
+        try {
+            const parsed = new URL(url);
+
+            return RESTRICTED_PROTOCOLS.includes(
+                parsed.protocol
+            );
+        } catch {
+            return true;
+        }
+    }
+
+    // =====================================================
+    // MAIN ANALYSIS
+    // =====================================================
+
+    async function analyzeCurrentPage() {
+        if (!elements.analyzeButton) {
             return;
         }
 
-        status.textContent = message;
+        elements.analyzeButton.disabled = true;
 
-        status.className = className;
-
-    }
-
-
-    // ========================================================
-    // PRIVACY GUARD UI
-    // ========================================================
-
-    function updateGuardUI(enabled) {
-
-        if (guardStatus) {
-
-            guardStatus.textContent = enabled
-                ? "Privacy Guard is active on supported pages."
-                : "Privacy Guard is currently off.";
-
-        }
-
-
-        if (privacyGuardButton) {
-
-            privacyGuardButton.setAttribute(
-                "aria-pressed",
-                String(enabled)
-            );
-
-            const label = privacyGuardButton.querySelector("span:nth-child(2)");
-
-            if (label) {
-                label.textContent = enabled
-                    ? "Disable Privacy Guard"
-                    : "Enable Privacy Guard";
-            }
-
-        }
-
-    }
-
-
-    // ========================================================
-    // LOAD PRIVACY GUARD STATE
-    // ========================================================
-
-    function loadGuardState() {
-
-        chrome.storage.local.get(
-            ["privacyGuardEnabled"],
-            (result) => {
-
-                const enabled =
-                    result.privacyGuardEnabled !== false;
-
-                updateGuardUI(enabled);
-
-            }
+        setStatus(
+            "Analyzing page..."
         );
 
-    }
+        setScannerStatus(
+            "Scanning"
+        );
 
+        try {
+            const tab =
+                await getActiveTab();
 
-    // ========================================================
-    // PRIVACY GUARD TOGGLE
-    // ========================================================
+            if (!tab || !tab.id) {
+                throw new Error(
+                    "Active tab could not be found."
+                );
+            }
 
-    if (privacyGuardButton) {
+            // ---------------------------------------------
+            // URL ANALYSIS
+            // ---------------------------------------------
 
-        privacyGuardButton.addEventListener(
-            "click",
-            () => {
+            await analyzeURL(tab.url);
 
-                chrome.storage.local.get(
-                    ["privacyGuardEnabled"],
-                    (result) => {
-
-                        const currentState =
-                            result.privacyGuardEnabled !== false;
-
-                        const newState =
-                            !currentState;
-
-
-                        chrome.storage.local.set(
-                            {
-                                privacyGuardEnabled:
-                                    newState
-                            },
-                            () => {
-
-                                updateGuardUI(
-                                    newState
-                                );
-
-                                setStatus(
-                                    newState
-                                        ? "Privacy Guard enabled."
-                                        : "Privacy Guard disabled.",
-                                    "is-success"
-                                );
-
-                            }
-                        );
-
-                    }
+            if (isRestrictedPage(tab.url)) {
+                setStatus(
+                    "This page cannot be analyzed. Open a normal HTTP/HTTPS webpage."
                 );
 
+                setScannerStatus(
+                    "Unavailable"
+                );
+
+                return;
             }
-        );
 
-    }
-
-
-    // ========================================================
-    // DASHBOARD BUTTON
-    // ========================================================
-
-    if (dashboardButton) {
-
-        dashboardButton.addEventListener(
-            "click",
-            () => {
-
-                chrome.tabs.create({
-                    url:
-                        chrome.runtime.getURL(
-                            "dashboard/dashboard.html"
-                        )
-                });
-
-            }
-        );
-
-    }
-
-
-    // ========================================================
-    // SCAN BUTTON
-    // ========================================================
-
-    if (scanButton) {
-
-        scanButton.addEventListener(
-            "click",
-            async () => {
-
-                try {
-
-                    // ----------------------------------------
-                    // STEP 1 — UI
-                    // ----------------------------------------
-
-                    scanButton.disabled = true;
-
-                    setStatus(
-                        "Scanning page...",
-                        "is-loading"
-                    );
-
-
-                    // ----------------------------------------
-                    // STEP 2 — GET ACTIVE TAB
-                    // ----------------------------------------
-
-                    const tabs =
-                        await chrome.tabs.query({
-                            active: true,
-                            currentWindow: true
-                        });
-
-
-                    if (
-                        !tabs ||
-                        tabs.length === 0
-                    ) {
-
-                        throw new Error(
-                            "No active tab found."
-                        );
-
-                    }
-
-
-                    const activeTab =
-                        tabs[0];
-
-
-                    if (!activeTab.id) {
-
-                        throw new Error(
-                            "Unable to access active tab."
-                        );
-
-                    }
-
-
-                    // ----------------------------------------
-                    // STEP 3 — CHECK RESTRICTED PAGES
-                    // ----------------------------------------
-
-                    const restrictedProtocols = [
-                        "chrome:",
-                        "edge:",
-                        "about:",
-                        "chrome-extension:",
-                        "brave:"
-                    ];
-
-
-                    if (
-                        activeTab.url &&
-                        restrictedProtocols.some(
-                            protocol =>
-                                activeTab.url.startsWith(
-                                    protocol
-                                )
-                        )
-                    ) {
-
-                        throw new Error(
-                            "LockLens cannot scan this browser system page."
-                        );
-
-                    }
-
-
-                    // ----------------------------------------
-                    // STEP 4 — LOAD SCANNER INTO PAGE
-                    // ----------------------------------------
-                    //
-                    // scanner.js runs in the webpage context.
-                    //
-                    // It analyzes:
-                    // - visible page signals
-                    // - form metadata
-                    //
-                    // It does NOT read field values.
-                    //
-                    // ----------------------------------------
-
-                    const scannerState =
-                        await chrome.scripting.executeScript({
-
-                            target: {
-                                tabId: activeTab.id
-                            },
-
-                            func: () => Boolean(window.LockLensScanner)
-
-                        });
-
-
-                    // Files injected with executeScript share the tab's
-                    // extension world. Re-injecting scanner.js would redeclare
-                    // its top-level constants and make subsequent scans fail.
-                    if (!scannerState?.[0]?.result) {
-
-                        await chrome.scripting.executeScript({
-
-                            target: {
-                                tabId: activeTab.id
-                            },
-
-                            files: [
-                                "scripts/scanner.js"
-                            ]
-
-                        });
-
-                    }
-
-
-                    // ----------------------------------------
-                    // STEP 5 — RUN COMPLETE PAGE SCAN
-                    // ----------------------------------------
-
-                    const scanResults =
-                        await chrome.scripting.executeScript({
-
-                            target: {
-                                tabId: activeTab.id
-                            },
-
-                            func: () => {
-
-                                if (
-                                    !window.LockLensScanner
-                                ) {
-
-                                    throw new Error(
-                                        "LockLens scanner is unavailable."
-                                    );
-
-                                }
-
-
-                                const rawFindings =
-                                    window.LockLensScanner
-                                        .performFullScan(
-                                            document
-                                        );
-
-
-                                return (
-                                    window.LockLensScanner
-                                        .deduplicateFindings(
-                                            rawFindings
-                                        )
-                                );
-
-                            }
-
-                        });
-
-
-                    // ----------------------------------------
-                    // STEP 6 — GET FINDINGS
-                    // ----------------------------------------
-
-                    const findings =
-                        scanResults?.[0]?.result || [];
-
-
-                    // ----------------------------------------
-                    // STEP 7 — CALCULATE RISK
-                    // ----------------------------------------
-
-                    if (
-                        !window.LockLensRiskEngine
-                    ) {
-
-                        throw new Error(
-                            "Risk Engine is not loaded in popup."
-                        );
-
-                    }
-
-
-                    const risk =
-                        window.LockLensRiskEngine
-                            .calculateRisk(
-                                findings
+            // ---------------------------------------------
+            // CHECK SCANNER
+            // ---------------------------------------------
+
+            let scannerAvailable = false;
+
+            try {
+                const result =
+                    await chrome.scripting.executeScript({
+                        target: {
+                            tabId: tab.id
+                        },
+
+                        func: () => {
+                            return Boolean(
+                                window.LockLensScanner
                             );
-                    let recommendations = null;
-
-                    if (
-                        window.LockLensRecommendations
-                    ) {
-                        recommendations =
-                            window.LockLensRecommendations
-                                .generateRecommendations(
-                                    findings,
-                                    risk
-                                );
-
-                    }
-
-                    // ----------------------------------------
-                    // STEP 8 — SAVE CURRENT RESULT
-                    // ----------------------------------------
-
-                    await chrome.storage.local.set({
-
-                        lockLensFindings:
-                            findings,
-
-                        lockLensRisk:
-                            risk,
-
-                        lockLensRecommendations:
-                            recommendations,
-
-                        lockLensLastScan:
-                            new Date().toISOString()
-
+                        }
                     });
 
+                scannerAvailable =
+                    Boolean(
+                        result?.[0]?.result
+                    );
+            } catch (error) {
+                console.warn(
+                    "Scanner check failed:",
+                    error
+                );
+            }
 
-                    // ----------------------------------------
-                    // STEP 9 — RECORD TIMELINE EVENT
-                    // ----------------------------------------
-                    //
-                    // Only anonymous metadata is stored.
-                    //
-                    // No URL.
-                    // No domain.
-                    // No page title.
-                    // No typed values.
-                    //
-                    // ----------------------------------------
+            // ---------------------------------------------
+            // INJECT SCANNER IF REQUIRED
+            // ---------------------------------------------
 
-                    if (
-                        window.LockLensTimeline &&
-                        typeof
-                            window.LockLensTimeline
-                                .securelyRecordExposure
-                            === "function"
-                    ) {
+            if (!scannerAvailable) {
+                await chrome.scripting.executeScript({
+                    target: {
+                        tabId: tab.id
+                    },
 
-                        await
-                            window.LockLensTimeline
-                                .securelyRecordExposure(
-                                    findings,
-                                    risk
+                    files: [
+                        "scripts/scanner.js"
+                    ]
+                });
+            }
+
+            // ---------------------------------------------
+            // RUN SCANNER
+            // ---------------------------------------------
+
+            const scanResult =
+                await chrome.scripting.executeScript({
+                    target: {
+                        tabId: tab.id
+                    },
+
+                    func: () => {
+                        if (
+                            !window.LockLensScanner ||
+                            typeof
+                                window.LockLensScanner
+                                    .performFullScan !==
+                                "function"
+                        ) {
+                            throw new Error(
+                                "LockLens scanner is not available."
+                            );
+                        }
+
+                        const rawFindings =
+                            window.LockLensScanner
+                                .performFullScan(
+                                    document
                                 );
 
+                        if (
+                            typeof
+                                window.LockLensScanner
+                                    .deduplicateFindings ===
+                                "function"
+                        ) {
+                            return window.LockLensScanner
+                                .deduplicateFindings(
+                                    rawFindings
+                                );
+                        }
+
+                        return rawFindings;
                     }
+                });
 
+            const findings =
+                scanResult?.[0]?.result || [];
 
-                    // ----------------------------------------
-                    // STEP 10 — SHOW RESULT
-                    // ----------------------------------------
+            // ---------------------------------------------
+            // RISK ENGINE
+            // ---------------------------------------------
 
-                    if (
-                        findings.length === 0
-                    ) {
+            let risk;
 
-                        setStatus(
-                            "No supported privacy signals detected.",
-                            "is-success"
+            if (
+                window.LockLensRiskEngine &&
+                typeof
+                    window.LockLensRiskEngine
+                        .calculateRisk ===
+                        "function"
+            ) {
+                risk =
+                    window.LockLensRiskEngine
+                        .calculateRisk(
+                            findings
                         );
-
-                    } else {
-
-                        setStatus(
-                            `Analysis complete: ${risk.level} risk (${risk.score}/100).`,
-                            "is-success"
-                        );
-
-                    }
-
-
-                    // ----------------------------------------
-                    // DEBUG INFORMATION
-                    // ----------------------------------------
-
-                    console.log(
-                        "LockLens Findings:",
+            } else {
+                risk =
+                    calculateFallbackRisk(
                         findings
                     );
+            }
 
-                    console.log(
-                        "LockLens Risk:",
-                        risk
-                    );
+            // ---------------------------------------------
+            // RECOMMENDATIONS
+            // ---------------------------------------------
 
+            let recommendations = null;
+
+            if (
+                window.LockLensRecommendations &&
+                typeof
+                    window.LockLensRecommendations
+                        .generateRecommendations ===
+                        "function"
+            ) {
+                recommendations =
+                    window.LockLensRecommendations
+                        .generateRecommendations(
+                            findings,
+                            risk
+                        );
+            }
+
+            // ---------------------------------------------
+            // GET URL METADATA
+            // ---------------------------------------------
+
+            const urlData =
+                await chrome.storage.local.get(
+                    "lockLensURLRisk"
+                );
+
+            const urlRisk =
+                urlData.lockLensURLRisk ||
+                null;
+
+            // ---------------------------------------------
+            // EXPLANATION ENGINE
+            // ---------------------------------------------
+
+            let explanation = null;
+
+            if (
+                window.LockLensExplanation &&
+                typeof
+                    window.LockLensExplanation
+                        .generateExplanation ===
+                        "function"
+            ) {
+                explanation =
+                    window.LockLensExplanation
+                        .generateExplanation(
+                            findings,
+                            risk,
+                            urlRisk
+                        );
+            }
+
+            // ---------------------------------------------
+            // SAVE RESULTS
+            // ---------------------------------------------
+
+            await chrome.storage.local.set({
+                lockLensFindings:
+                    findings,
+
+                lockLensRisk:
+                    risk,
+
+                lockLensRecommendations:
+                    recommendations,
+
+                lockLensExplanation:
+                    explanation,
+
+                lockLensLastScan: {
+                    timestamp:
+                        Date.now(),
+
+                    findingCount:
+                        findings.length
+                }
+            });
+
+            // ---------------------------------------------
+            // TIMELINE
+            // ---------------------------------------------
+
+            if (
+                window.LockLensTimeline &&
+                typeof
+                    window.LockLensTimeline
+                        .securelyRecordExposure ===
+                        "function"
+            ) {
+                try {
+                    await window.LockLensTimeline
+                        .securelyRecordExposure(
+                            findings,
+                            risk
+                        );
                 } catch (error) {
-
-                    // ----------------------------------------
-                    // ERROR HANDLING
-                    // ----------------------------------------
-
-                    console.error(
-                        "LockLens scan error:",
+                    console.warn(
+                        "Timeline recording failed:",
                         error
                     );
-
-
-                    setStatus(
-                        error.message ||
-                        "Unable to scan this page.",
-                        "is-error"
-                    );
-
-                } finally {
-
-                    scanButton.disabled = false;
-
                 }
+            }
 
+            // ---------------------------------------------
+            // DISPLAY EXPLANATION
+            // ---------------------------------------------
+
+            renderExplanation(
+                explanation
+            );
+
+            setStatus(
+                findings.length > 0
+                    ? `Analysis complete. ${findings.length} exposure signal(s) detected.`
+                    : "Analysis complete. No exposure signals detected."
+            );
+
+            setScannerStatus(
+                "Complete"
+            );
+        } catch (error) {
+            console.error(
+                "Page analysis failed:",
+                error
+            );
+
+            setStatus(
+                "Analysis failed: " +
+                    (
+                        error.message ||
+                        "Unknown error."
+                    )
+            );
+
+            setScannerStatus(
+                "Error"
+            );
+        } finally {
+            elements.analyzeButton.disabled =
+                false;
+        }
+    }
+
+    // =====================================================
+    // URL RISK
+    // =====================================================
+
+    async function analyzeURL(url) {
+        if (!elements.urlPanel) {
+            return;
+        }
+
+        try {
+            if (
+                !window.LockLensURLInspector ||
+                typeof
+                    window.LockLensURLInspector
+                        .analyzeURL !==
+                        "function"
+            ) {
+                return;
+            }
+
+            const result =
+                window.LockLensURLInspector
+                    .analyzeURL(url);
+
+            renderURLRisk(result);
+
+            /*
+             * IMPORTANT:
+             * The actual URL is never stored.
+             */
+
+            const anonymousURLRisk =
+                result
+                    ? {
+                          score:
+                              result.score,
+
+                          level:
+                              result.level,
+
+                          checks: {
+                              https:
+                                  Boolean(
+                                      result.checks?.https
+                                  ),
+
+                              ipAddress:
+                                  Boolean(
+                                      result.checks?.ipAddress
+                                  ),
+
+                              longUrl:
+                                  Boolean(
+                                      result.checks?.longUrl
+                                  ),
+
+                              manySubdomains:
+                                  Boolean(
+                                      result.checks?.manySubdomains
+                                  ),
+
+                              suspiciousCharacters:
+                                  Array.isArray(
+                                      result.checks
+                                          ?.suspiciousCharacters
+                                  )
+                                      ? result.checks
+                                            .suspiciousCharacters
+                                            .length
+                                      : 0,
+
+                              suspiciousPort:
+                                  Boolean(
+                                      result.checks
+                                          ?.suspiciousPort
+                                  ),
+
+                              usernameInUrl:
+                                  Boolean(
+                                      result.checks
+                                          ?.usernameInUrl
+                                  ),
+
+                              urlShortener:
+                                  Boolean(
+                                      result.checks
+                                          ?.urlShortener
+                                  ),
+
+                              encodedUrl:
+                                  Boolean(
+                                      result.checks
+                                          ?.encodedUrl
+                                  )
+                          },
+
+                          timestamp:
+                              Date.now()
+                      }
+                    : null;
+
+            await chrome.storage.local.set({
+                lockLensURLRisk:
+                    anonymousURLRisk
+            });
+        } catch (error) {
+            console.error(
+                "URL analysis failed:",
+                error
+            );
+
+            await chrome.storage.local.set({
+                lockLensURLRisk:
+                    null
+            });
+        }
+    }
+
+    function renderURLRisk(result) {
+        if (!elements.urlPanel) {
+            return;
+        }
+
+        elements.urlPanel.style.display =
+            "block";
+
+        if (!result) {
+            if (elements.urlScore) {
+                elements.urlScore.textContent =
+                    "—";
+            }
+
+            if (elements.urlLevel) {
+                elements.urlLevel.textContent =
+                    "Unavailable";
+            }
+
+            return;
+        }
+
+        if (elements.urlScore) {
+            elements.urlScore.textContent =
+                `${result.score}/100`;
+        }
+
+        if (elements.urlLevel) {
+            elements.urlLevel.textContent =
+                result.level ||
+                "Unknown";
+
+            elements.urlLevel.className =
+                `url-risk-level ${String(
+                    result.level ||
+                        "unknown"
+                ).toLowerCase()}`;
+        }
+
+        if (elements.urlChecks) {
+            elements.urlChecks.innerHTML =
+                "";
+
+            const checks =
+                result.checks || {};
+
+            addURLCheck(
+                checks.https,
+                "HTTPS",
+                "Secure connection",
+                "HTTPS not detected"
+            );
+
+            addURLCheck(
+                !checks.ipAddress,
+                "IP Address",
+                "Domain name used",
+                "IP address used"
+            );
+
+            addURLCheck(
+                !checks.longUrl,
+                "URL Length",
+                "Normal length",
+                "Unusually long URL"
+            );
+
+            addURLCheck(
+                !checks.manySubdomains,
+                "Subdomains",
+                "Normal structure",
+                "Many subdomains"
+            );
+
+            addURLCheck(
+                !(
+                    Array.isArray(
+                        checks.suspiciousCharacters
+                    ) &&
+                    checks.suspiciousCharacters
+                        .length > 0
+                ),
+                "Characters",
+                "No suspicious characters",
+                "Suspicious characters detected"
+            );
+
+            addURLCheck(
+                !checks.suspiciousPort,
+                "Port",
+                "No unusual port",
+                "Unusual port detected"
+            );
+
+            addURLCheck(
+                !checks.usernameInUrl,
+                "Username",
+                "No username in URL",
+                "Username embedded in URL"
+            );
+
+            addURLCheck(
+                !checks.urlShortener,
+                "URL Shortener",
+                "No common shortener",
+                "Shortened URL detected"
+            );
+
+            addURLCheck(
+                !checks.encodedUrl,
+                "Encoding",
+                "No unusual encoding",
+                "Encoded URL content detected"
+            );
+        }
+
+        if (
+            elements.urlRecommendations
+        ) {
+            elements.urlRecommendations.innerHTML =
+                "";
+
+            (
+                result.recommendations ||
+                []
+            ).forEach(
+                (recommendation) => {
+                    const div =
+                        document.createElement(
+                            "div"
+                        );
+
+                    div.className =
+                        "url-recommendation";
+
+                    div.textContent =
+                        recommendation;
+
+                    elements.urlRecommendations
+                        .appendChild(div);
+                }
+            );
+        }
+    }
+
+    function addURLCheck(
+        passed,
+        title,
+        successText,
+        warningText
+    ) {
+        if (!elements.urlChecks) {
+            return;
+        }
+
+        const div =
+            document.createElement(
+                "div"
+            );
+
+        div.className =
+            `url-check ${
+                passed
+                    ? "pass"
+                    : "warning"
+            }`;
+
+        div.innerHTML = `
+            <span class="url-check-icon">
+                ${passed ? "✓" : "⚠"}
+            </span>
+
+            <div>
+                <strong>
+                    ${escapeHTML(title)}
+                </strong>
+
+                <small>
+                    ${escapeHTML(
+                        passed
+                            ? successText
+                            : warningText
+                    )}
+                </small>
+            </div>
+        `;
+
+        elements.urlChecks.appendChild(
+            div
+        );
+    }
+
+    // =====================================================
+    // EXPLANATION
+    // =====================================================
+
+    function renderExplanation(
+        explanation
+    ) {
+        if (
+            !elements.explanationPanel
+        ) {
+            return;
+        }
+
+        if (!explanation) {
+            elements.explanationPanel.style.display =
+                "none";
+
+            return;
+        }
+
+        elements.explanationPanel.style.display =
+            "block";
+
+        if (
+            elements.explanationSummary
+        ) {
+            elements.explanationSummary.textContent =
+                explanation.summary ||
+                "No explanation available.";
+        }
+
+        if (
+            elements.explanationReasons
+        ) {
+            elements.explanationReasons.innerHTML =
+                "";
+
+            const title =
+                document.createElement(
+                    "div"
+                );
+
+            title.className =
+                "explanation-title";
+
+            title.textContent =
+                "WHY WAS THIS RISK DETECTED?";
+
+            elements.explanationReasons
+                .appendChild(title);
+
+            (
+                explanation.reasons ||
+                []
+            ).forEach(
+                (reason) => {
+                    const item =
+                        document.createElement(
+                            "div"
+                        );
+
+                    item.className =
+                        "explanation-item";
+
+                    item.textContent =
+                        reason;
+
+                    elements.explanationReasons
+                        .appendChild(item);
+                }
+            );
+        }
+
+        if (
+            elements.explanationActions
+        ) {
+            elements.explanationActions.innerHTML =
+                "";
+
+            const title =
+                document.createElement(
+                    "div"
+                );
+
+            title.className =
+                "explanation-title";
+
+            title.textContent =
+                "WHAT SHOULD I DO?";
+
+            elements.explanationActions
+                .appendChild(title);
+
+            (
+                explanation.actions ||
+                []
+            ).forEach(
+                (action) => {
+                    const item =
+                        document.createElement(
+                            "div"
+                        );
+
+                    item.className =
+                        "explanation-item";
+
+                    item.textContent =
+                        action;
+
+                    elements.explanationActions
+                        .appendChild(item);
+                }
+            );
+        }
+    }
+
+    // =====================================================
+    // PRIVACY GUARD
+    // =====================================================
+
+    async function loadPrivacyGuardState() {
+        const data =
+            await chrome.storage.local.get(
+                "privacyGuardEnabled"
+            );
+
+        updatePrivacyGuardButton(
+            data.privacyGuardEnabled !== false
+        );
+    }
+
+    async function togglePrivacyGuard() {
+        try {
+            const data =
+                await chrome.storage.local.get(
+                    "privacyGuardEnabled"
+                );
+
+            const currentState =
+                data.privacyGuardEnabled !== false;
+
+            const newState =
+                !currentState;
+
+            await chrome.storage.local.set({
+                privacyGuardEnabled:
+                    newState
+            });
+
+            updatePrivacyGuardButton(
+                newState
+            );
+
+            setStatus(
+                newState
+                    ? "Privacy Guard enabled."
+                    : "Privacy Guard disabled."
+            );
+        } catch (error) {
+            console.error(
+                "Privacy Guard toggle failed:",
+                error
+            );
+
+            setStatus(
+                "Could not change Privacy Guard."
+            );
+        }
+    }
+
+    function updatePrivacyGuardButton(
+        enabled
+    ) {
+        if (
+            !elements.privacyGuardButton
+        ) {
+            return;
+        }
+
+        elements.privacyGuardButton.textContent =
+            enabled
+                ? "Privacy Guard: ON"
+                : "Privacy Guard: OFF";
+
+        elements.privacyGuardButton.classList.toggle(
+            "active",
+            enabled
+        );
+    }
+
+    // =====================================================
+    // LOAD PREVIOUS RESULTS
+    // =====================================================
+
+    async function loadPreviousResults() {
+        try {
+            const data =
+                await chrome.storage.local.get([
+                    "lockLensRisk",
+                    "lockLensURLRisk",
+                    "lockLensExplanation"
+                ]);
+
+            if (data.lockLensURLRisk) {
+                renderStoredURLRisk(
+                    data.lockLensURLRisk
+                );
+            }
+
+            if (data.lockLensExplanation) {
+                renderExplanation(
+                    data.lockLensExplanation
+                );
+            }
+
+            if (data.lockLensRisk) {
+                setStatus(
+                    `Last privacy risk: ${data.lockLensRisk.score}/100 — ${data.lockLensRisk.level}`
+                );
+            }
+        } catch (error) {
+            console.warn(
+                "Could not load previous results:",
+                error
+            );
+        }
+    }
+
+    function renderStoredURLRisk(
+        data
+    ) {
+        if (
+            !elements.urlPanel ||
+            !data
+        ) {
+            return;
+        }
+
+        elements.urlPanel.style.display =
+            "block";
+
+        if (elements.urlScore) {
+            elements.urlScore.textContent =
+                `${data.score ?? 0}/100`;
+        }
+
+        if (elements.urlLevel) {
+            elements.urlLevel.textContent =
+                data.level ||
+                "Unknown";
+
+            elements.urlLevel.className =
+                `url-risk-level ${String(
+                    data.level ||
+                        "unknown"
+                ).toLowerCase()}`;
+        }
+
+        if (elements.urlChecks) {
+            elements.urlChecks.innerHTML =
+                "";
+
+            const checks =
+                data.checks || {};
+
+            addURLCheck(
+                checks.https,
+                "HTTPS",
+                "Secure connection",
+                "HTTPS not detected"
+            );
+
+            addURLCheck(
+                !checks.ipAddress,
+                "IP Address",
+                "Domain name used",
+                "IP address used"
+            );
+
+            addURLCheck(
+                !checks.longUrl,
+                "URL Length",
+                "Normal length",
+                "Unusually long URL"
+            );
+
+            addURLCheck(
+                !checks.manySubdomains,
+                "Subdomains",
+                "Normal structure",
+                "Many subdomains"
+            );
+
+            addURLCheck(
+                !(
+                    typeof
+                        checks.suspiciousCharacters ===
+                        "number" &&
+                    checks.suspiciousCharacters > 0
+                ),
+                "Characters",
+                "No suspicious characters",
+                "Suspicious characters detected"
+            );
+
+            addURLCheck(
+                !checks.suspiciousPort,
+                "Port",
+                "No unusual port",
+                "Unusual port detected"
+            );
+
+            addURLCheck(
+                !checks.usernameInUrl,
+                "Username",
+                "No username in URL",
+                "Username embedded in URL"
+            );
+
+            addURLCheck(
+                !checks.urlShortener,
+                "URL Shortener",
+                "No common shortener",
+                "Shortened URL detected"
+            );
+
+            addURLCheck(
+                !checks.encodedUrl,
+                "Encoding",
+                "No unusual encoding",
+                "Encoded URL content detected"
+            );
+        }
+    }
+
+    // =====================================================
+    // DASHBOARD
+    // =====================================================
+
+    function openDashboard() {
+        chrome.tabs.create({
+            url:
+                chrome.runtime.getURL(
+                    "dashboard/dashboard.html"
+                )
+        });
+    }
+
+    // =====================================================
+    // FALLBACK RISK ENGINE
+    // =====================================================
+
+    function calculateFallbackRisk(
+        findings
+    ) {
+        const weights = {
+            name: 5,
+            email: 10,
+            phone: 15,
+            address: 20,
+            date: 10,
+            password: 10,
+            payment: 20,
+            government_id: 25,
+            location: 15,
+            username: 5
+        };
+
+        let score = 0;
+
+        const categories =
+            new Set();
+
+        findings.forEach(
+            (finding) => {
+                const category =
+                    String(
+                        finding.category ||
+                            ""
+                    ).toLowerCase();
+
+                if (
+                    weights[category] !==
+                    undefined
+                ) {
+                    score +=
+                        weights[category];
+
+                    categories.add(
+                        category
+                    );
+                }
             }
         );
 
+        if (
+            categories.size >= 2 &&
+            categories.size <= 3
+        ) {
+            score += 5;
+        } else if (
+            categories.size >= 4
+        ) {
+            score += 10;
+        }
+
+        score =
+            Math.min(
+                score,
+                100
+            );
+
+        let level = "Low";
+
+        if (score >= 76) {
+            level = "Critical";
+        } else if (score >= 51) {
+            level = "High";
+        } else if (score >= 21) {
+            level = "Medium";
+        }
+
+        return {
+            version: "fallback",
+            score,
+            level,
+            categories:
+                Array.from(categories),
+            findingCount:
+                findings.length
+        };
     }
 
+    // =====================================================
+    // HELPERS
+    // =====================================================
 
-    // ========================================================
-    // INITIALIZE
-    // ========================================================
+    function setStatus(message) {
+        if (elements.status) {
+            elements.status.textContent =
+                message;
+        }
+    }
 
-    loadGuardState();
+    function setScannerStatus(message) {
+        if (elements.scannerStatus) {
+            elements.scannerStatus.textContent =
+                message;
+        }
+    }
 
+    function escapeHTML(value) {
+        const div =
+            document.createElement(
+                "div"
+            );
 
-    setStatus(
-        "Ready to scan.",
-        ""
-    );
+        div.textContent =
+            String(value ?? "");
 
-});
+        return div.innerHTML;
+    }
+})();
