@@ -25,6 +25,10 @@
     let guardEnabled = true;
     let observer = null;
     let scanTimer = null;
+    // Per-document state only. Form elements are the stable identity; no form
+    // metadata or user-entered values are retained.
+    const acknowledgedForms = new WeakSet();
+    let activeWarningForm = null;
 
 
     // ============================================================
@@ -233,23 +237,50 @@
     // SCAN PAGE
     // ============================================================
 
+    function scanSensitiveForms() {
+
+        const formCategories = [];
+
+        document.querySelectorAll("form").forEach((form) => {
+
+            const categories = new Set();
+
+            Array.from(form.elements).forEach((field) => {
+
+                if (
+                    !field.matches?.(
+                        "input, textarea, select"
+                    )
+                ) {
+                    return;
+                }
+
+                detectSensitiveCategories(field).forEach(
+                    (category) => categories.add(category)
+                );
+
+            });
+
+            if (categories.size > 0) {
+                formCategories.push({
+                    form,
+                    categories: Array.from(categories)
+                });
+            }
+
+        });
+
+        return formCategories;
+    }
+
     function scanPage() {
 
         const categories = new Set();
 
-        const fields = document.querySelectorAll(
-            "input, textarea, select"
-        );
-
-        fields.forEach((field) => {
-
-            const detected =
-                detectSensitiveCategories(field);
-
-            detected.forEach((category) => {
+        scanSensitiveForms().forEach((formResult) => {
+            formResult.categories.forEach((category) => {
                 categories.add(category);
             });
-
         });
 
         return Array.from(categories);
@@ -352,9 +383,13 @@
     // CREATE PRIVACY POPUP
     // ============================================================
 
-    function createWarning(categories, level) {
+    function createWarning(form, categories, level) {
 
-        removeWarning();
+        // Keep the currently displayed warning intact while its form remains
+        // active. This also prevents observer-triggered duplicate overlays.
+        if (document.getElementById(WARNING_ID)) {
+            return;
+        }
 
         if (!guardEnabled) {
             return;
@@ -490,6 +525,7 @@
                 event.stopPropagation();
 
                 removeWarning();
+                activeWarningForm = null;
 
             }
         );
@@ -646,7 +682,16 @@
 
                 event.stopPropagation();
 
+                // Remember only this DOM form for the current page session.
+                // WeakSet entries disappear with the element and never contain
+                // submitted or typed field data.
+                acknowledgedForms.add(form);
                 removeWarning();
+                activeWarningForm = null;
+
+                // A different form may already be present, so continue
+                // scanning without allowing this acknowledged form to alert.
+                runPrivacyGuard();
 
             }
         );
@@ -713,36 +758,66 @@
         }
 
 
-        const categories =
-            scanPage();
+        const sensitiveForms =
+            scanSensitiveForms();
+
+        const categories = new Set();
+
+        sensitiveForms.forEach((formResult) => {
+            formResult.categories.forEach((category) => {
+                categories.add(category);
+            });
+        });
+
+        const pageCategories =
+            Array.from(categories);
 
 
         const level =
             calculateGuardLevel(
-                categories
+                pageCategories
             );
 
 
         await saveGuardResult(
-            categories,
+            pageCategories,
             level
         );
 
-
-        if (
-            categories.length > 0
-        ) {
-
-            createWarning(
-                categories,
-                level
+        const activeFormStillSensitive =
+            activeWarningForm &&
+            document.contains(activeWarningForm) &&
+            sensitiveForms.some(
+                (formResult) =>
+                    formResult.form === activeWarningForm
             );
 
-        } else {
+        if (activeFormStillSensitive) {
+            return;
+        }
 
+        activeWarningForm = null;
+
+        const nextWarning =
+            sensitiveForms.find(
+                (formResult) =>
+                    !acknowledgedForms.has(formResult.form)
+            );
+
+        if (!nextWarning) {
             removeWarning();
 
+            return;
+
         }
+
+        activeWarningForm = nextWarning.form;
+
+        createWarning(
+            nextWarning.form,
+            nextWarning.categories,
+            calculateGuardLevel(nextWarning.categories)
+        );
     }
 
 
