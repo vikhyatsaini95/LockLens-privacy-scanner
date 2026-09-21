@@ -1,1092 +1,748 @@
+/* =========================================================
+   LockLens Dashboard
+   Step 20 - Complete Dashboard Controller
+   ========================================================= */
+
 (() => {
     "use strict";
+
+    /* =========================================================
+       CONSTANTS
+       ========================================================= */
 
     const STORAGE_KEYS = [
         "lockLensFindings",
         "lockLensRisk",
+        "lockLensUnifiedRisk",
         "lockLensRecommendations",
         "lockLensExplanation",
+        "lockLensPrivacyLabel",
+        "lockLensPrivacyDecision",
+        "lockLensURLRisk",
+        "lockLensEmailRisk",
         "lockLensLastScan",
-        "privacyGuardEnabled",
         "lockLensGuardLastResult",
         "lockLensExposureEvents",
-        "exposureTimeline",
-        "lockLensURLRisk"
+        "exposureTimeline"
     ];
 
-    document.addEventListener(
-        "DOMContentLoaded",
-        initializeDashboard
-    );
+    /* =========================================================
+       HELPERS
+       ========================================================= */
 
-    async function initializeDashboard() {
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function escapeHTML(value) {
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function formatDate(timestamp) {
+        if (!timestamp) {
+            return "Not available";
+        }
+
         try {
-            await renderDashboard();
-
-            chrome.storage.local.onChanged.addListener(
-                async () => {
-                    await renderDashboard();
-                }
-            );
-
-            const clearButton =
-                document.getElementById(
-                    "clearDataButton"
-                );
-
-            if (clearButton) {
-                clearButton.addEventListener(
-                    "click",
-                    clearLocalData
-                );
-            }
-        } catch (error) {
-            console.error(
-                "Dashboard initialization failed:",
-                error
-            );
+            return new Date(timestamp).toLocaleString();
+        } catch {
+            return "Not available";
         }
     }
 
-    // =====================================================
-    // MAIN DASHBOARD
-    // =====================================================
+    function getRiskClass(level) {
+        const normalized =
+            String(level || "Low")
+                .toLowerCase();
 
-    async function renderDashboard() {
-        const data =
-            await chrome.storage.local.get(
-                STORAGE_KEYS
-            );
+        if (normalized === "critical") {
+            return "critical";
+        }
 
-        renderRisk(
-            data.lockLensRisk
-        );
+        if (normalized === "high") {
+            return "high";
+        }
 
-        renderLastScan(
-            data.lockLensLastScan
-        );
+        if (normalized === "medium") {
+            return "medium";
+        }
 
-        renderURLRisk(
-            data.lockLensURLRisk
-        );
+        return "low";
+    }
 
-        renderExplanation(
-            data.lockLensExplanation
-        );
-
-        renderFindings(
-            data.lockLensFindings || []
-        );
-
-        renderPrivacyGuard(
-            data.privacyGuardEnabled,
-            data.lockLensGuardLastResult
-        );
-
-        renderTimeline(
-            data.lockLensExposureEvents,
-            data.exposureTimeline
-        );
-
-        renderCategories(
-            data.lockLensFindings || []
-        );
-
-        renderRecommendations(
-            data.lockLensRecommendations
+    function getRiskScore(data) {
+        return Math.round(
+            Number(
+                data?.score ??
+                data?.risk?.score ??
+                0
+            )
         );
     }
 
-    // =====================================================
-    // RISK
-    // =====================================================
+    function getRiskLevel(data) {
+        return (
+            data?.level ||
+            data?.risk?.level ||
+            "Low"
+        );
+    }
 
-    function renderRisk(risk) {
-        const scoreElement =
-            document.getElementById(
-                "riskScore"
-            );
+    function emptyState(message) {
+        return `
+            <div class="empty-state">
+                ${escapeHTML(message)}
+            </div>
+        `;
+    }
 
-        const levelElement =
-            document.getElementById(
-                "riskLevel"
-            );
+    /* =========================================================
+       STORAGE
+       ========================================================= */
 
-        const categoriesElement =
-            document.getElementById(
-                "riskCategories"
-            );
-
-        if (!risk) {
-            if (scoreElement) {
-                scoreElement.textContent =
-                    "—";
+    function getStorage(keys) {
+        return new Promise((resolve) => {
+            if (
+                typeof chrome === "undefined" ||
+                !chrome.storage ||
+                !chrome.storage.local
+            ) {
+                resolve({});
+                return;
             }
 
-            if (levelElement) {
-                levelElement.textContent =
-                    "Not analyzed";
+            chrome.storage.local.get(
+                keys,
+                (result) => {
+                    if (chrome.runtime?.lastError) {
+                        console.error(
+                            "LockLens storage error:",
+                            chrome.runtime.lastError.message
+                        );
 
-                levelElement.className =
-                    "risk-unknown";
+                        resolve({});
+                        return;
+                    }
+
+                    resolve(result || {});
+                }
+            );
+        });
+    }
+
+    /* =========================================================
+       RENDER OVERVIEW
+       ========================================================= */
+
+    function renderOverview(data) {
+        const risk =
+            data.lockLensUnifiedRisk ||
+            data.lockLensRisk ||
+            null;
+
+        const score =
+            getRiskScore(risk);
+
+        const level =
+            getRiskLevel(risk);
+
+        setText("riskScore", score);
+        setText("riskLevel", level);
+
+        const riskScoreElement =
+            $("riskScore");
+
+        const riskLevelElement =
+            $("riskLevel");
+
+        if (riskScoreElement) {
+            riskScoreElement.className =
+                `risk-value ${getRiskClass(level)}`;
+        }
+
+        if (riskLevelElement) {
+            riskLevelElement.className =
+                `risk-level ${getRiskClass(level)}`;
+        }
+
+        const findings =
+            Array.isArray(
+                data.lockLensFindings
+            )
+                ? data.lockLensFindings
+                : [];
+
+        setText(
+            "findingCount",
+            findings.length
+        );
+
+        setText(
+            "lastScan",
+            formatDate(
+                data.lockLensLastScan
+            )
+        );
+
+        const summary =
+            $("riskSummary");
+
+        if (summary) {
+            if (level === "Critical") {
+                summary.textContent =
+                    "Multiple high-sensitivity privacy signals were detected.";
+            } else if (level === "High") {
+                summary.textContent =
+                    "Several privacy-sensitive signals were detected.";
+            } else if (level === "Medium") {
+                summary.textContent =
+                    "Some privacy-sensitive signals were detected.";
+            } else {
+                summary.textContent =
+                    "No significant privacy risk signals were detected.";
             }
+        }
+    }
 
-            if (categoriesElement) {
-                categoriesElement.textContent =
-                    "No categories detected.";
+    /* =========================================================
+       TEXT HELPER
+       ========================================================= */
+
+    function setText(id, value) {
+        const element = $(id);
+
+        if (element) {
+            element.textContent =
+                value ?? "";
+        }
+    }
+
+    /* =========================================================
+       PRIVACY NUTRITION LABEL
+       ========================================================= */
+
+    function renderNutritionLabel(data) {
+        const label =
+            data.lockLensPrivacyLabel;
+
+        if (!label) {
+            const container =
+                $("nutritionLabel");
+
+            if (container) {
+                container.innerHTML =
+                    emptyState(
+                        "Analyze a page from the LockLens popup to generate the Privacy Nutrition Label."
+                    );
             }
 
             return;
         }
 
-        if (scoreElement) {
-            scoreElement.textContent =
-                `${risk.score ?? 0}/100`;
+        const score =
+            Number(
+                label.risk?.score ?? 0
+            );
+
+        const level =
+            label.risk?.level ||
+            "Low";
+
+        setText(
+            "nutritionScore",
+            Math.round(score)
+        );
+
+        setText(
+            "nutritionExposure",
+            label.exposureSummary ||
+            "No significant exposure detected."
+        );
+
+        setText(
+            "nutritionSummary",
+            label.exposureSummary ||
+            "Privacy exposure has been analyzed locally."
+        );
+
+        const sensitivity =
+            $("nutritionSensitivity");
+
+        if (sensitivity) {
+            sensitivity.innerHTML = `
+                <div class="nutrition-stat">
+                    <strong>
+                        ${escapeHTML(
+                            label.sensitivity?.level ||
+                            "Low"
+                        )}
+                    </strong>
+                    <span>
+                        Sensitivity
+                    </span>
+                </div>
+
+                <div class="nutrition-stat">
+                    <strong>
+                        ${Math.round(
+                            Number(
+                                label.sensitivity?.score ||
+                                0
+                            )
+                        )}
+                    </strong>
+                    <span>
+                        Sensitivity Score
+                    </span>
+                </div>
+            `;
         }
 
-        if (levelElement) {
-            levelElement.textContent =
-                risk.level || "Unknown";
+        const signals =
+            $("nutritionSignals");
 
-            levelElement.className =
-                getRiskClass(
-                    risk.level
-                );
-        }
-
-        if (categoriesElement) {
-            const categories =
+        if (signals) {
+            const securitySignals =
                 Array.isArray(
-                    risk.categories
+                    label.securitySignals
                 )
-                    ? risk.categories
+                    ? label.securitySignals
                     : [];
 
-            categoriesElement.textContent =
-                categories.length > 0
-                    ? `Categories: ${categories
-                          .map(
-                              formatCategory
-                          )
-                          .join(", ")}`
-                    : "No categories detected.";
+            signals.innerHTML =
+                securitySignals.length > 0
+                    ? securitySignals
+                        .map(
+                            (signal) => `
+                                <div class="nutrition-item">
+                                    ${escapeHTML(
+                                        typeof signal === "string"
+                                            ? signal
+                                            : signal.message ||
+                                              signal.description ||
+                                              signal.name ||
+                                              JSON.stringify(signal)
+                                    )}
+                                </div>
+                            `
+                        )
+                        .join("")
+                    : emptyState(
+                        "No additional security signals were detected."
+                    );
         }
+
+        const actions =
+            $("nutritionActions");
+
+        if (actions) {
+            const actionList =
+                Array.isArray(
+                    label.actions
+                )
+                    ? label.actions
+                    : [];
+
+            actions.innerHTML =
+                actionList.length > 0
+                    ? actionList
+                        .map(
+                            (action) => `
+                                <div class="nutrition-item">
+                                    ${escapeHTML(
+                                        typeof action === "string"
+                                            ? action
+                                            : action.message ||
+                                              action.title ||
+                                              action.description ||
+                                              JSON.stringify(action)
+                                    )}
+                                </div>
+                            `
+                        )
+                        .join("")
+                    : emptyState(
+                        "No additional actions were generated."
+                    );
+        }
+
+        const notes =
+            $("nutritionPrivacyNotes");
+
+        if (notes) {
+            const privacyNotes =
+                Array.isArray(
+                    label.privacyNotes
+                )
+                    ? label.privacyNotes
+                    : [];
+
+            notes.innerHTML =
+                privacyNotes.length > 0
+                    ? privacyNotes
+                        .map(
+                            (note) => `
+                                <div class="nutrition-item">
+                                    ${escapeHTML(
+                                        typeof note === "string"
+                                            ? note
+                                            : note.message ||
+                                              note.description ||
+                                              JSON.stringify(note)
+                                    )}
+                                </div>
+                            `
+                        )
+                        .join("")
+                    : emptyState(
+                        "Privacy processing information unavailable."
+                    );
+        }
+
+        setText(
+            "nutritionMinimization",
+            label.dataMinimization ||
+            "LockLens evaluates metadata locally and avoids storing raw personal information."
+        );
     }
 
-    // =====================================================
-    // LAST SCAN
-    // =====================================================
+    /* =========================================================
+       CATEGORY INTELLIGENCE
+       ========================================================= */
 
-    function renderLastScan(
-        lastScan
-    ) {
-        const element =
-            document.getElementById(
-                "lastScanTime"
+    function renderCategoryIntelligence(data) {
+        const container =
+            $("categoryIntelligence");
+
+        if (!container) {
+            return;
+        }
+
+        const label =
+            data.lockLensPrivacyLabel;
+
+        const intelligence =
+            label?.categoryIntelligence;
+
+        if (
+            !intelligence ||
+            typeof intelligence !== "object"
+        ) {
+            container.innerHTML =
+                emptyState(
+                    "Category intelligence will appear after page analysis."
+                );
+
+            return;
+        }
+
+        const groups =
+            Object.values(
+                intelligence
             );
+
+        if (groups.length === 0) {
+            container.innerHTML =
+                emptyState(
+                    "No privacy categories detected."
+                );
+
+            return;
+        }
+
+        container.innerHTML =
+            groups
+                .map((group) => {
+                    const score =
+                        Math.min(
+                            100,
+                            Math.max(
+                                0,
+                                Number(
+                                    group.sensitivityScore ||
+                                    group.sensitivity ||
+                                    0
+                                ) * 20
+                            )
+                        );
+
+                    const level =
+                        group.sensitivityLevel ||
+                        "Low";
+
+                    const categories =
+                        Array.isArray(
+                            group.categories
+                        )
+                            ? group.categories
+                            : [];
+
+                    return `
+                        <div class="category-intelligence-card">
+
+                            <div class="category-intelligence-header">
+
+                                <div>
+                                    <h3>
+                                        ${escapeHTML(
+                                            group.name ||
+                                            "Privacy Category"
+                                        )}
+                                    </h3>
+
+                                    <p>
+                                        ${escapeHTML(
+                                            group.description ||
+                                            ""
+                                        )}
+                                    </p>
+                                </div>
+
+                                <span class="risk-badge ${getRiskClass(level)}">
+                                    ${escapeHTML(level)}
+                                </span>
+
+                            </div>
+
+                            <div class="category-progress">
+                                <div
+                                    class="category-progress-bar ${getRiskClass(level)}"
+                                    style="width:${score}%"
+                                ></div>
+                            </div>
+
+                            <div class="category-intelligence-footer">
+
+                                <span>
+                                    Sensitivity:
+                                    ${Math.round(score)}
+                                </span>
+
+                                <span>
+                                    Detected:
+                                    ${group.detected ? "Yes" : "No"}
+                                </span>
+
+                            </div>
+
+                            ${
+                                categories.length > 0
+                                    ? `
+                                        <div class="category-pills">
+                                            ${categories
+                                                .map(
+                                                    (category) => `
+                                                        <span class="category-pill">
+                                                            ${escapeHTML(
+                                                                category
+                                                            )}
+                                                        </span>
+                                                    `
+                                                )
+                                                .join("")}
+                                        </div>
+                                    `
+                                    : ""
+                            }
+
+                        </div>
+                    `;
+                })
+                .join("");
+    }
+
+    /* =========================================================
+       RISK SOURCES
+       ========================================================= */
+
+    function renderRiskSources(data) {
+        const unified =
+            data.lockLensUnifiedRisk;
+
+        if (!unified) {
+            return;
+        }
+
+        const sources =
+            unified.sources || {};
+
+        renderSourceCard(
+            "pageRisk",
+            sources.page
+        );
+
+        renderSourceCard(
+            "urlRisk",
+            sources.url
+        );
+
+        renderSourceCard(
+            "emailRisk",
+            sources.email
+        );
+
+        setText(
+            "correlationBonus",
+            unified.correlationBonus
+                ? `+${unified.correlationBonus}`
+                : "0"
+        );
+    }
+
+    function renderSourceCard(id, source) {
+        const element =
+            $(id);
 
         if (!element) {
             return;
         }
 
-        if (!lastScan?.timestamp) {
+        if (!source || source.available === false) {
             element.textContent =
-                "No scan yet";
+                "Not available";
 
             return;
         }
 
-        element.textContent =
-            `Last analyzed: ${formatDate(
-                lastScan.timestamp
-            )}`;
-    }
-
-    // =====================================================
-    // URL RISK
-    // =====================================================
-
-    function renderURLRisk(
-        urlRisk
-    ) {
-        const scoreElement =
-            document.getElementById(
-                "dashboardURLScore"
+        const score =
+            Number(
+                source.score || 0
             );
 
-        const levelElement =
-            document.getElementById(
-                "dashboardURLLevel"
-            );
+        const level =
+            source.level || "Low";
 
-        const checksElement =
-            document.getElementById(
-                "dashboardURLChecks"
-            );
+        element.innerHTML = `
+            <strong>
+                ${Math.round(score)}
+            </strong>
 
-        const timeElement =
-            document.getElementById(
-                "dashboardURLTime"
-            );
-
-        if (!urlRisk) {
-            if (scoreElement) {
-                scoreElement.textContent =
-                    "—";
-            }
-
-            if (levelElement) {
-                levelElement.textContent =
-                    "Not analyzed";
-
-                levelElement.className =
-                    "risk-unknown";
-            }
-
-            if (checksElement) {
-                checksElement.innerHTML = `
-                    <div class="empty-state">
-                        No URL assessment yet.
-                    </div>
-                `;
-            }
-
-            if (timeElement) {
-                timeElement.textContent =
-                    "No URL assessment yet.";
-            }
-
-            return;
-        }
-
-        if (scoreElement) {
-            scoreElement.textContent =
-                `${urlRisk.score ?? 0}/100`;
-        }
-
-        if (levelElement) {
-            levelElement.textContent =
-                urlRisk.level ||
-                "Unknown";
-
-            levelElement.className =
-                getRiskClass(
-                    urlRisk.level
-                );
-        }
-
-        if (checksElement) {
-            checksElement.innerHTML =
-                "";
-
-            const checks =
-                urlRisk.checks || {};
-
-            addURLCheck(
-                checksElement,
-                Boolean(
-                    checks.https
-                ),
-                "HTTPS",
-                "Secure connection",
-                "HTTPS not detected"
-            );
-
-            addURLCheck(
-                checksElement,
-                !Boolean(
-                    checks.ipAddress
-                ),
-                "IP Address",
-                "Domain name used",
-                "IP address used"
-            );
-
-            addURLCheck(
-                checksElement,
-                !Boolean(
-                    checks.longUrl
-                ),
-                "URL Length",
-                "Normal length",
-                "Unusually long URL"
-            );
-
-            addURLCheck(
-                checksElement,
-                !Boolean(
-                    checks.manySubdomains
-                ),
-                "Subdomains",
-                "Normal structure",
-                "Many subdomains"
-            );
-
-            addURLCheck(
-                checksElement,
-                !(
-                    typeof
-                        checks.suspiciousCharacters ===
-                        "number" &&
-                    checks.suspiciousCharacters >
-                        0
-                ),
-                "Characters",
-                "No suspicious characters",
-                "Suspicious characters detected"
-            );
-
-            addURLCheck(
-                checksElement,
-                !Boolean(
-                    checks.suspiciousPort
-                ),
-                "Port",
-                "No unusual port",
-                "Unusual port detected"
-            );
-
-            addURLCheck(
-                checksElement,
-                !Boolean(
-                    checks.usernameInUrl
-                ),
-                "Username",
-                "No username in URL",
-                "Username embedded in URL"
-            );
-
-            addURLCheck(
-                checksElement,
-                !Boolean(
-                    checks.urlShortener
-                ),
-                "URL Shortener",
-                "No common shortener",
-                "Shortened URL detected"
-            );
-
-            addURLCheck(
-                checksElement,
-                !Boolean(
-                    checks.encodedUrl
-                ),
-                "Encoding",
-                "No unusual encoding",
-                "Encoded URL content detected"
-            );
-        }
-
-        if (timeElement) {
-            timeElement.textContent =
-                urlRisk.timestamp
-                    ? `Assessment time: ${formatDate(
-                          urlRisk.timestamp
-                      )}`
-                    : "Assessment time unavailable.";
-        }
-    }
-
-    function addURLCheck(
-        container,
-        passed,
-        title,
-        successText,
-        warningText
-    ) {
-        const item =
-            document.createElement(
-                "div"
-            );
-
-        item.className =
-            `url-dashboard-check ${
-                passed
-                    ? "pass"
-                    : "warn"
-            }`;
-
-        item.innerHTML = `
-            <span class="url-dashboard-check-icon">
-                ${passed ? "✓" : "⚠"}
+            <span class="risk-badge ${getRiskClass(level)}">
+                ${escapeHTML(level)}
             </span>
-
-            <div>
-                <strong>
-                    ${escapeHTML(title)}
-                </strong>
-
-                <small>
-                    ${escapeHTML(
-                        passed
-                            ? successText
-                            : warningText
-                    )}
-                </small>
-            </div>
         `;
-
-        container.appendChild(
-            item
-        );
     }
 
-    // =====================================================
-    // EXPLAINABLE RISK
-    // =====================================================
+    /* =========================================================
+       EXPLANATION
+       ========================================================= */
 
-    function renderExplanation(
-        explanation
-    ) {
+    function renderExplanation(data) {
         const container =
-            document.getElementById(
-                "dashboardExplanation"
-            );
+            $("explanation");
 
         if (!container) {
             return;
         }
 
-        container.innerHTML =
-            "";
+        const explanation =
+            data.lockLensExplanation;
 
         if (!explanation) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    Run a LockLens scan to generate
-                    an explanation.
-                </div>
-            `;
+            container.innerHTML =
+                emptyState(
+                    "Analyze a page to generate an explanation of the risk score."
+                );
 
             return;
         }
 
-        // ---------------------------------------------
-        // SUMMARY
-        // ---------------------------------------------
+        if (typeof explanation === "string") {
+            container.innerHTML = `
+                <p>
+                    ${escapeHTML(explanation)}
+                </p>
+            `;
+
+            return;
+        }
 
         const summary =
-            document.createElement(
-                "div"
-            );
-
-        summary.className =
-            "explanation-summary-dashboard";
-
-        summary.textContent =
             explanation.summary ||
-            "No explanation available.";
+            explanation.explanation ||
+            explanation.message ||
+            "";
 
-        container.appendChild(
-            summary
-        );
-
-        // ---------------------------------------------
-        // REASONS
-        // ---------------------------------------------
-
-        if (
+        const reasons =
             Array.isArray(
                 explanation.reasons
-            ) &&
-            explanation.reasons.length
-        ) {
-            const title =
-                document.createElement(
-                    "div"
-                );
-
-            title.className =
-                "explanation-section-title";
-
-            title.textContent =
-                "WHY WAS THIS RISK DETECTED?";
-
-            container.appendChild(
-                title
-            );
-
-            explanation.reasons.forEach(
-                (reason) => {
-                    const item =
-                        document.createElement(
-                            "div"
-                        );
-
-                    item.className =
-                        "explanation-dashboard-item";
-
-                    item.textContent =
-                        reason;
-
-                    container.appendChild(
-                        item
-                    );
-                }
-            );
-        }
-
-        // ---------------------------------------------
-        // ACTIONS
-        // ---------------------------------------------
-
-        if (
-            Array.isArray(
-                explanation.actions
-            ) &&
-            explanation.actions.length
-        ) {
-            const title =
-                document.createElement(
-                    "div"
-                );
-
-            title.className =
-                "explanation-section-title";
-
-            title.textContent =
-                "WHAT SHOULD THE USER DO?";
-
-            container.appendChild(
-                title
-            );
-
-            explanation.actions.forEach(
-                (action) => {
-                    const item =
-                        document.createElement(
-                            "div"
-                        );
-
-                    item.className =
-                        "explanation-dashboard-item";
-
-                    item.textContent =
-                        action;
-
-                    container.appendChild(
-                        item
-                    );
-                }
-            );
-        }
-
-        // ---------------------------------------------
-        // CATEGORY DETAILS
-        // ---------------------------------------------
-
-        if (
-            Array.isArray(
-                explanation.categoryDetails
-            ) &&
-            explanation.categoryDetails
-                .length
-        ) {
-            const title =
-                document.createElement(
-                    "div"
-                );
-
-            title.className =
-                "explanation-section-title";
-
-            title.textContent =
-                "CATEGORY DETAILS";
-
-            container.appendChild(
-                title
-            );
-
-            const grid =
-                document.createElement(
-                    "div"
-                );
-
-            grid.className =
-                "explanation-category-grid";
-
-            explanation.categoryDetails.forEach(
-                (detail) => {
-                    const card =
-                        document.createElement(
-                            "div"
-                        );
-
-                    card.className =
-                        "explanation-category-card";
-
-                    const titleElement =
-                        document.createElement(
-                            "strong"
-                        );
-
-                    titleElement.textContent =
-                        detail.title ||
-                        formatCategory(
-                            detail.category
-                        );
-
-                    const explanationElement =
-                        document.createElement(
-                            "p"
-                        );
-
-                    explanationElement.textContent =
-                        detail.explanation ||
-                        "";
-
-                    const actionElement =
-                        document.createElement(
-                            "p"
-                        );
-
-                    actionElement.className =
-                        "explanation-category-action";
-
-                    actionElement.textContent =
-                        `Action: ${
-                            detail.action ||
-                            "Review whether this information is necessary."
-                        }`;
-
-                    card.appendChild(
-                        titleElement
-                    );
-
-                    card.appendChild(
-                        explanationElement
-                    );
-
-                    card.appendChild(
-                        actionElement
-                    );
-
-                    grid.appendChild(
-                        card
-                    );
-                }
-            );
-
-            container.appendChild(
-                grid
-            );
-        }
-    }
-
-    // =====================================================
-    // FINDINGS
-    // =====================================================
-
-    function renderFindings(
-        findings
-    ) {
-        const container =
-            document.getElementById(
-                "findingsList"
-            );
-
-        if (!container) {
-            return;
-        }
-
-        container.innerHTML =
-            "";
-
-        if (
-            !Array.isArray(
-                findings
-            ) ||
-            findings.length === 0
-        ) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    No exposure signals detected.
-                </div>
-            `;
-
-            return;
-        }
-
-        const categoryMap =
-            new Map();
-
-        findings.forEach(
-            (finding) => {
-                const category =
-                    String(
-                        finding.category ||
-                            "unknown"
-                    ).toLowerCase();
-
-                categoryMap.set(
-                    category,
-                    (
-                        categoryMap.get(
-                            category
-                        ) || 0
-                    ) + 1
-                );
-            }
-        );
-
-        categoryMap.forEach(
-            (
-                count,
-                category
-            ) => {
-                const item =
-                    document.createElement(
-                        "div"
-                    );
-
-                item.className =
-                    "finding-item";
-
-                const title =
-                    document.createElement(
-                        "strong"
-                    );
-
-                title.textContent =
-                    formatCategory(
-                        category
-                    );
-
-                const description =
-                    document.createElement(
-                        "span"
-                    );
-
-                description.textContent =
-                    `${count} exposure signal${
-                        count === 1
-                            ? ""
-                            : "s"
-                    }`;
-
-                item.appendChild(
-                    title
-                );
-
-                item.appendChild(
-                    description
-                );
-
-                container.appendChild(
-                    item
-                );
-            }
-        );
-    }
-
-    // =====================================================
-    // PRIVACY GUARD
-    // =====================================================
-
-    function renderPrivacyGuard(
-        enabled,
-        lastResult
-    ) {
-        const status =
-            document.getElementById(
-                "guardStatus"
-            );
-
-        const result =
-            document.getElementById(
-                "guardLastResult"
-            );
-
-        if (status) {
-            const isEnabled =
-                enabled !== false;
-
-            status.textContent =
-                isEnabled
-                    ? "Privacy Guard Active"
-                    : "Privacy Guard Disabled";
-
-            status.style.color =
-                isEnabled
-                    ? "#00e6b8"
-                    : "#ff8a8a";
-        }
-
-        if (result) {
-            if (!lastResult) {
-                result.textContent =
-                    "No recent guard assessment.";
-
-                return;
-            }
-
-            const categories =
-                Array.isArray(
-                    lastResult.categories
+            )
+                ? explanation.reasons
+                : Array.isArray(
+                    explanation.factors
                 )
-                    ? lastResult.categories
+                    ? explanation.factors
                     : [];
 
-            if (categories.length === 0) {
-                result.textContent =
-                    "Latest assessment: no sensitive form categories detected.";
-            } else {
-                result.textContent =
-                    `Latest assessment: ${categories
+        let html = "";
+
+        if (summary) {
+            html += `
+                <div class="explanation-summary">
+                    ${escapeHTML(summary)}
+                </div>
+            `;
+        }
+
+        if (reasons.length > 0) {
+            html += `
+                <ul class="explanation-list">
+                    ${reasons
                         .map(
-                            formatCategory
+                            (reason) => `
+                                <li>
+                                    ${escapeHTML(
+                                        typeof reason === "string"
+                                            ? reason
+                                            : reason.message ||
+                                              reason.reason ||
+                                              reason.title ||
+                                              JSON.stringify(reason)
+                                    )}
+                                </li>
+                            `
                         )
-                        .join(", ")}`;
-            }
+                        .join("")}
+                </ul>
+            `;
         }
+
+        container.innerHTML =
+            html ||
+            emptyState(
+                "No additional explanation is available."
+            );
     }
 
-    // =====================================================
-    // TIMELINE
-    // =====================================================
+    /* =========================================================
+       EXPOSURE CATEGORIES
+       ========================================================= */
 
-    function renderTimeline(
-        events,
-        legacyTimeline
-    ) {
+    function renderCategories(data) {
         const container =
-            document.getElementById(
-                "timelineContainer"
-            );
+            $("categories");
 
         if (!container) {
             return;
         }
 
-        container.innerHTML =
-            "";
+        const findings =
+            Array.isArray(
+                data.lockLensFindings
+            )
+                ? data.lockLensFindings
+                : [];
 
-        let normalizedEvents =
-            normalizeTimeline(
-                events,
-                legacyTimeline
-            );
-
-        if (
-            normalizedEvents.length ===
-            0
-        ) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    No timeline events yet.
-                </div>
-            `;
-
-            return;
-        }
-
-        normalizedEvents =
-            normalizedEvents
-                .slice(-20)
-                .reverse();
-
-        normalizedEvents.forEach(
-            (event) => {
-                const item =
-                    document.createElement(
-                        "div"
-                    );
-
-                item.className =
-                    "timeline-item";
-
-                const date =
-                    document.createElement(
-                        "div"
-                    );
-
-                date.className =
-                    "timeline-date";
-
-                date.textContent =
-                    formatDate(
-                        event.timestamp
-                    );
-
-                const categories =
-                    document.createElement(
-                        "div"
-                    );
-
-                categories.className =
-                    "timeline-categories";
-
-                categories.textContent =
-                    Array.isArray(
-                        event.categories
-                    ) &&
-                    event.categories
-                        .length
-                        ? event.categories
-                              .map(
-                                  formatCategory
-                              )
-                              .join(", ")
-                        : "No categories";
-
-                const risk =
-                    document.createElement(
-                        "div"
-                    );
-
-                risk.className =
-                    "timeline-risk";
-
-                risk.textContent =
-                    `${event.riskScore ?? 0}/100${
-                        event.riskLevel
-                            ? ` • ${event.riskLevel}`
-                            : ""
-                    }`;
-
-                item.appendChild(
-                    date
+        if (findings.length === 0) {
+            container.innerHTML =
+                emptyState(
+                    "No privacy-sensitive categories detected."
                 );
-
-                item.appendChild(
-                    categories
-                );
-
-                item.appendChild(
-                    risk
-                );
-
-                container.appendChild(
-                    item
-                );
-            }
-        );
-    }
-
-    function normalizeTimeline(
-        events,
-        legacyTimeline
-    ) {
-        if (
-            Array.isArray(events) &&
-            events.length > 0
-        ) {
-            return events.map(
-                (event) => ({
-                    timestamp:
-                        event.timestamp ||
-                        Date.now(),
-
-                    categories:
-                        Array.isArray(
-                            event.categories
-                        )
-                            ? event.categories
-                            : [],
-
-                    riskScore:
-                        event.riskScore ??
-                        0,
-
-                    riskLevel:
-                        event.riskLevel ||
-                        ""
-                })
-            );
-        }
-
-        if (
-            legacyTimeline &&
-            typeof legacyTimeline ===
-                "object"
-        ) {
-            const output = [];
-
-            Object.entries(
-                legacyTimeline
-            ).forEach(
-                (
-                    [date, value]
-                ) => {
-                    const categories =
-                        value.categories &&
-                        typeof value.categories ===
-                            "object"
-                            ? Object.keys(
-                                  value.categories
-                              )
-                            : [];
-
-                    const riskScores =
-                        Array.isArray(
-                            value.riskScores
-                        )
-                            ? value.riskScores
-                            : [];
-
-                    const latestScore =
-                        riskScores.length
-                            ? riskScores[
-                                  riskScores.length -
-                                      1
-                              ]
-                            : 0;
-
-                    output.push({
-                        timestamp:
-                            new Date(
-                                date
-                            ).getTime(),
-
-                        categories,
-
-                        riskScore:
-                            latestScore,
-
-                        riskLevel:
-                            getRiskLevel(
-                                latestScore
-                            )
-                    });
-                }
-            );
-
-            return output;
-        }
-
-        return [];
-    }
-
-    // =====================================================
-    // CATEGORY CHART
-    // =====================================================
-
-    function renderCategories(
-        findings
-    ) {
-        const container =
-            document.getElementById(
-                "categoryChart"
-            );
-
-        if (!container) {
-            return;
-        }
-
-        container.innerHTML =
-            "";
-
-        if (
-            !Array.isArray(
-                findings
-            ) ||
-            findings.length === 0
-        ) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    No category data available.
-                </div>
-            `;
 
             return;
         }
@@ -1097,204 +753,923 @@
             (finding) => {
                 const category =
                     String(
-                        finding.category ||
-                            "unknown"
-                    ).toLowerCase();
+                        finding?.category ||
+                        finding?.type ||
+                        "Unknown"
+                    );
 
-                counts[category] =
-                    (
-                        counts[category] ||
-                        0
-                    ) + 1;
+                const key =
+                    category.toLowerCase();
+
+                counts[key] =
+                    (counts[key] || 0) + 1;
             }
         );
 
-        const entries =
-            Object.entries(
-                counts
-            ).sort(
-                (a, b) =>
-                    b[1] - a[1]
-            );
+        container.innerHTML =
+            Object.entries(counts)
+                .map(
+                    ([category, count]) => `
+                        <div class="category-item">
 
-        const max =
-            entries[0]?.[1] || 1;
+                            <span class="category-pill">
+                                ${escapeHTML(category)}
+                            </span>
 
-        entries.forEach(
-            (
-                [category, count]
-            ) => {
-                const row =
-                    document.createElement(
-                        "div"
-                    );
+                            <strong>
+                                ${count}
+                            </strong>
 
-                row.className =
-                    "category-row";
-
-                const name =
-                    document.createElement(
-                        "div"
-                    );
-
-                name.className =
-                    "category-name";
-
-                name.textContent =
-                    formatCategory(
-                        category
-                    );
-
-                const bar =
-                    document.createElement(
-                        "div"
-                    );
-
-                bar.className =
-                    "category-bar";
-
-                const fill =
-                    document.createElement(
-                        "div"
-                    );
-
-                fill.className =
-                    "category-bar-fill";
-
-                const percentage =
-                    Math.max(
-                        5,
-                        (
-                            count /
-                            max
-                        ) * 100
-                    );
-
-                fill.style.width =
-                    `${percentage}%`;
-
-                bar.appendChild(
-                    fill
-                );
-
-                const countElement =
-                    document.createElement(
-                        "div"
-                    );
-
-                countElement.className =
-                    "category-count";
-
-                countElement.textContent =
-                    count;
-
-                row.appendChild(
-                    name
-                );
-
-                row.appendChild(
-                    bar
-                );
-
-                row.appendChild(
-                    countElement
-                );
-
-                container.appendChild(
-                    row
-                );
-            }
-        );
+                        </div>
+                    `
+                )
+                .join("");
     }
 
-    // =====================================================
-    // RECOMMENDATIONS
-    // =====================================================
+    /* =========================================================
+       URL ASSESSMENT
+       ========================================================= */
 
-    function renderRecommendations(
-        recommendations
-    ) {
+    function renderURLAssessment(data) {
         const container =
-            document.getElementById(
-                "recommendationsList"
-            );
+            $("urlAssessment");
 
         if (!container) {
             return;
         }
 
-        container.innerHTML =
-            "";
+        const result =
+            data.lockLensURLRisk;
 
-        let items = [];
-
-        if (
-            Array.isArray(
-                recommendations
-            )
-        ) {
-            items =
-                recommendations;
-        } else if (
-            recommendations &&
-            Array.isArray(
-                recommendations.recommendations
-            )
-        ) {
-            items =
-                recommendations
-                    .recommendations;
-        }
-
-        if (items.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    No recommendations available.
-                </div>
-            `;
+        if (!result) {
+            container.innerHTML =
+                emptyState(
+                    "No URL assessment available."
+                );
 
             return;
         }
 
-        items.forEach(
-            (recommendation) => {
-                const item =
-                    document.createElement(
-                        "div"
-                    );
+        const checks =
+            result.checks || {};
 
-                item.className =
-                    "recommendation-item";
+        const signals = [];
 
-                if (
-                    typeof recommendation ===
-                    "string"
-                ) {
-                    item.textContent =
-                        recommendation;
-                } else {
-                    item.textContent =
-                        recommendation.text ||
-                        recommendation.message ||
-                        recommendation.title ||
-                        "Privacy recommendation";
-                }
+        if (checks.https === false) {
+            signals.push(
+                "HTTPS is not detected."
+            );
+        }
 
-                container.appendChild(
-                    item
-                );
+        if (checks.ipAddress) {
+            signals.push(
+                "The URL uses an IP address."
+            );
+        }
+
+        if (checks.manySubdomains) {
+            signals.push(
+                "Many subdomains were detected."
+            );
+        }
+
+        if (checks.longUrl) {
+            signals.push(
+                "The URL is unusually long."
+            );
+        }
+
+        if (checks.suspiciousPort) {
+            signals.push(
+                "A non-standard port was detected."
+            );
+        }
+
+        if (checks.usernameInUrl) {
+            signals.push(
+                "Username information appears in the URL."
+            );
+        }
+
+        if (checks.urlShortener) {
+            signals.push(
+                "A URL-shortening pattern was detected."
+            );
+        }
+
+        if (checks.encodedUrl) {
+            signals.push(
+                "Encoded URL content was detected."
+            );
+        }
+
+        container.innerHTML = `
+            <div class="assessment-header">
+
+                <strong>
+                    ${Math.round(
+                        Number(result.score || 0)
+                    )}
+                </strong>
+
+                <span class="risk-badge ${getRiskClass(result.level)}">
+                    ${escapeHTML(
+                        result.level || "Low"
+                    )}
+                </span>
+
+            </div>
+
+            ${
+                signals.length > 0
+                    ? `
+                        <ul class="assessment-list">
+                            ${signals
+                                .map(
+                                    (signal) => `
+                                        <li>
+                                            ${escapeHTML(signal)}
+                                        </li>
+                                    `
+                                )
+                                .join("")}
+                        </ul>
+                    `
+                    : `
+                        <p>
+                            No obvious structural URL risk signals were detected.
+                        </p>
+                    `
             }
-        );
+        `;
     }
 
-    // =====================================================
-    // CLEAR DATA
-    // =====================================================
+    /* =========================================================
+       EMAIL ASSESSMENT
+       ========================================================= */
+
+    function renderEmailAssessment(data) {
+        const container =
+            $("emailAssessment");
+
+        if (!container) {
+            return;
+        }
+
+        const result =
+            data.lockLensEmailRisk;
+
+        if (!result) {
+            container.innerHTML =
+                emptyState(
+                    "No email header analysis available."
+                );
+
+            return;
+        }
+
+        const checks = [];
+
+        if (result.spf) {
+            checks.push(
+                `SPF: ${result.spf.status || "unknown"}`
+            );
+        }
+
+        if (result.dkim) {
+            checks.push(
+                `DKIM: ${result.dkim.status || "unknown"}`
+            );
+        }
+
+        if (result.dmarc) {
+            checks.push(
+                `DMARC: ${result.dmarc.status || "unknown"}`
+            );
+        }
+
+        if (
+            result.fromReturnPathMismatch
+        ) {
+            checks.push(
+                "From / Return-Path mismatch detected"
+            );
+        }
+
+        if (
+            result.replyToMismatch
+        ) {
+            checks.push(
+                "Reply-To mismatch detected"
+            );
+        }
+
+        if (
+            result.messageIdDomainMismatch
+        ) {
+            checks.push(
+                "Message-ID domain mismatch detected"
+            );
+        }
+
+        container.innerHTML = `
+            <div class="assessment-header">
+
+                <strong>
+                    ${Math.round(
+                        Number(result.score || 0)
+                    )}
+                </strong>
+
+                <span class="risk-badge ${getRiskClass(result.level)}">
+                    ${escapeHTML(
+                        result.level || "Low"
+                    )}
+                </span>
+
+            </div>
+
+            ${
+                checks.length > 0
+                    ? `
+                        <ul class="assessment-list">
+                            ${checks
+                                .map(
+                                    (check) => `
+                                        <li>
+                                            ${escapeHTML(check)}
+                                        </li>
+                                    `
+                                )
+                                .join("")}
+                        </ul>
+                    `
+                    : `
+                        <p>
+                            No major email authentication signals were detected.
+                        </p>
+                    `
+            }
+
+            <p class="privacy-note">
+                Raw email headers are not stored by LockLens.
+            </p>
+        `;
+    }
+
+    /* =========================================================
+       RECOMMENDATIONS
+       ========================================================= */
+
+    function renderRecommendations(data) {
+        const container =
+            $("recommendations");
+
+        if (!container) {
+            return;
+        }
+
+        const result =
+            data.lockLensRecommendations;
+
+        if (!result) {
+            container.innerHTML =
+                emptyState(
+                    "Recommendations will appear after analysis."
+                );
+
+            return;
+        }
+
+        const recommendations =
+            Array.isArray(
+                result.recommendations
+            )
+                ? result.recommendations
+                : [];
+
+        if (recommendations.length === 0) {
+            container.innerHTML =
+                emptyState(
+                    "No additional recommendations were generated."
+                );
+
+            return;
+        }
+
+        container.innerHTML =
+            recommendations
+                .map(
+                    (recommendation) => {
+                        const title =
+                            typeof recommendation === "string"
+                                ? "Recommendation"
+                                : recommendation.title ||
+                                  recommendation.name ||
+                                  "Recommendation";
+
+                        const description =
+                            typeof recommendation === "string"
+                                ? recommendation
+                                : recommendation.description ||
+                                  recommendation.message ||
+                                  "";
+
+                        return `
+                            <div class="recommendation-card">
+
+                                <h3>
+                                    ${escapeHTML(title)}
+                                </h3>
+
+                                <p>
+                                    ${escapeHTML(description)}
+                                </p>
+
+                            </div>
+                        `;
+                    }
+                )
+                .join("");
+    }
+
+    /* =========================================================
+       TIMELINE
+       ========================================================= */
+
+    function renderTimeline(data) {
+        const container =
+            $("timeline");
+
+        if (!container) {
+            return;
+        }
+
+        let events =
+            Array.isArray(
+                data.lockLensExposureEvents
+            )
+                ? data.lockLensExposureEvents
+                : [];
+
+        /*
+         * Backward compatibility with the
+         * previous exposureTimeline format.
+         */
+
+        if (
+            events.length === 0 &&
+            data.exposureTimeline
+        ) {
+            const timeline =
+                data.exposureTimeline;
+
+            events =
+                Object.entries(timeline)
+                    .map(
+                        ([date, value]) => ({
+                            timestamp:
+                                new Date(date)
+                                    .getTime(),
+
+                            categories:
+                                Object.keys(
+                                    value?.categories ||
+                                    {}
+                                ),
+
+                            riskScore:
+                                Array.isArray(
+                                    value?.riskScores
+                                ) &&
+                                value.riskScores.length
+                                    ? value.riskScores[
+                                        value.riskScores.length - 1
+                                    ]
+                                    : 0
+                        })
+                    )
+                    .sort(
+                        (a, b) =>
+                            b.timestamp -
+                            a.timestamp
+                    );
+        }
+
+        if (events.length === 0) {
+            container.innerHTML =
+                emptyState(
+                    "No exposure timeline events recorded yet."
+                );
+
+            return;
+        }
+
+        container.innerHTML =
+            events
+                .slice(0, 20)
+                .map((event) => {
+                    const categories =
+                        Array.isArray(
+                            event.categories
+                        )
+                            ? event.categories
+                            : [];
+
+                    return `
+                        <div class="timeline-item">
+
+                            <div class="timeline-date">
+                                ${escapeHTML(
+                                    formatDate(
+                                        event.timestamp
+                                    )
+                                )}
+                            </div>
+
+                            <div class="timeline-risk">
+                                Risk:
+                                ${Math.round(
+                                    Number(
+                                        event.riskScore ||
+                                        0
+                                    )
+                                )}
+                            </div>
+
+                            ${
+                                categories.length > 0
+                                    ? `
+                                        <div class="category-pills">
+                                            ${categories
+                                                .map(
+                                                    (category) => `
+                                                        <span class="category-pill">
+                                                            ${escapeHTML(
+                                                                category
+                                                            )}
+                                                        </span>
+                                                    `
+                                                )
+                                                .join("")}
+                                        </div>
+                                    `
+                                    : ""
+                            }
+
+                        </div>
+                    `;
+                })
+                .join("");
+    }
+
+    /* =========================================================
+       PRIVACY GUARD
+       ========================================================= */
+
+    function renderPrivacyGuard(data) {
+        const container =
+            $("privacyGuard");
+
+        if (!container) {
+            return;
+        }
+
+        const guard =
+            data.lockLensGuardLastResult;
+
+        const enabled =
+            data.privacyGuardEnabled !== false;
+
+        const level =
+            guard?.level ||
+            "Low";
+
+        const categories =
+            Array.isArray(
+                guard?.categories
+            )
+                ? guard.categories
+                : [];
+
+        container.innerHTML = `
+            <div class="guard-status">
+
+                <span class="risk-badge ${
+                    enabled
+                        ? "low"
+                        : "medium"
+                }">
+                    ${
+                        enabled
+                            ? "Active"
+                            : "Disabled"
+                    }
+                </span>
+
+                <span>
+                    Privacy Guard
+                </span>
+
+            </div>
+
+            <p>
+                Last detected level:
+                <strong>
+                    ${escapeHTML(level)}
+                </strong>
+            </p>
+
+            ${
+                categories.length > 0
+                    ? `
+                        <div class="category-pills">
+                            ${categories
+                                .map(
+                                    (category) => `
+                                        <span class="category-pill">
+                                            ${escapeHTML(
+                                                category
+                                            )}
+                                        </span>
+                                    `
+                                )
+                                .join("")}
+                        </div>
+                    `
+                    : `
+                        <p>
+                            No recent sensitive form categories detected.
+                        </p>
+                    `
+            }
+        `;
+    }
+
+    /* =========================================================
+       PRIVACY DECISION PATH
+       ========================================================= */
+
+    function renderDecisionPath(data) {
+        const container =
+            $("dashboardDecisionPath");
+
+        if (!container) {
+            return;
+        }
+
+        const decision =
+            data.lockLensPrivacyDecision;
+
+        if (!decision) {
+            container.innerHTML =
+                emptyState(
+                    "Analyze a page from the LockLens popup to generate the Privacy Decision Path."
+                );
+
+            return;
+        }
+
+        const path =
+            Array.isArray(
+                decision.path
+            )
+                ? decision.path
+                : [];
+
+        if (path.length === 0) {
+            container.innerHTML =
+                emptyState(
+                    "No decision-path steps are currently available."
+                );
+
+            return;
+        }
+
+        const overallRisk =
+            decision.risk || {};
+
+        const categories =
+            Array.isArray(
+                decision.categories
+            )
+                ? decision.categories
+                : [];
+
+        const groups =
+            Array.isArray(
+                decision.groups
+            )
+                ? decision.groups
+                : [];
+
+        container.innerHTML = `
+
+            <div class="decision-overview">
+
+                <div class="decision-overview-card">
+
+                    <span>
+                        Overall Risk
+                    </span>
+
+                    <strong class="risk-badge ${getRiskClass(
+                        overallRisk.level
+                    )}">
+                        ${escapeHTML(
+                            overallRisk.level ||
+                            "Low"
+                        )}
+                    </strong>
+
+                    <b>
+                        ${Math.round(
+                            Number(
+                                overallRisk.score ||
+                                0
+                            )
+                        )}
+                    </b>
+
+                </div>
+
+                <div class="decision-overview-card">
+
+                    <span>
+                        Categories
+                    </span>
+
+                    <b>
+                        ${categories.length}
+                    </b>
+
+                </div>
+
+                <div class="decision-overview-card">
+
+                    <span>
+                        Privacy Domains
+                    </span>
+
+                    <b>
+                        ${groups.length}
+                    </b>
+
+                </div>
+
+            </div>
+
+            <div class="dashboard-decision-flow">
+
+                ${path
+                    .map(
+                        (step, index) => {
+                            const title =
+                                step.title ||
+                                step.name ||
+                                `Step ${index + 1}`;
+
+                            const question =
+                                step.question ||
+                                "";
+
+                            const answer =
+                                step.answer ||
+                                step.explanation ||
+                                step.description ||
+                                "";
+
+                            const status =
+                                step.status ||
+                                step.level ||
+                                "";
+
+                            const stepCategories =
+                                Array.isArray(
+                                    step.categories
+                                )
+                                    ? step.categories
+                                    : [];
+
+                            return `
+                                <div class="dashboard-decision-card">
+
+                                    <div class="dashboard-decision-number">
+                                        ${index + 1}
+                                    </div>
+
+                                    <div class="dashboard-decision-content">
+
+                                        <h3>
+                                            ${escapeHTML(
+                                                title
+                                            )}
+                                        </h3>
+
+                                        ${
+                                            question
+                                                ? `
+                                                    <div class="dashboard-decision-question">
+                                                        ${escapeHTML(
+                                                            question
+                                                        )}
+                                                    </div>
+                                                `
+                                                : ""
+                                        }
+
+                                        ${
+                                            answer
+                                                ? `
+                                                    <p>
+                                                        ${escapeHTML(
+                                                            answer
+                                                        )}
+                                                    </p>
+                                                `
+                                                : ""
+                                        }
+
+                                        ${
+                                            stepCategories.length > 0
+                                                ? `
+                                                    <div class="category-pills">
+                                                        ${stepCategories
+                                                            .map(
+                                                                (category) => `
+                                                                    <span class="category-pill">
+                                                                        ${escapeHTML(
+                                                                            typeof category === "string"
+                                                                                ? category
+                                                                                : category.label ||
+                                                                                  category.name ||
+                                                                                  category.category ||
+                                                                                  ""
+                                                                        )}
+                                                                    </span>
+                                                                `
+                                                            )
+                                                            .join("")}
+                                                    </div>
+                                                `
+                                                : ""
+                                        }
+
+                                        ${
+                                            status
+                                                ? `
+                                                    <div class="dashboard-decision-status">
+                                                        ${escapeHTML(
+                                                            status
+                                                        )}
+                                                    </div>
+                                                `
+                                                : ""
+                                        }
+
+                                    </div>
+
+                                </div>
+                            `;
+                        }
+                    )
+                    .join("")}
+
+            </div>
+
+            <div class="decision-guidance">
+
+                <strong>
+                    How to use this path
+                </strong>
+
+                <p>
+                    LockLens presents the detected privacy
+                    signals and questions to consider. The
+                    final privacy decision remains with the user.
+                </p>
+
+            </div>
+        `;
+    }
+
+    /* =========================================================
+       PRIVACY ARCHITECTURE
+       ========================================================= */
+
+    function renderPrivacyArchitecture() {
+        const container =
+            $("privacyArchitecture");
+
+        if (!container) {
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="architecture-flow">
+
+                <div class="architecture-step">
+                    <strong>1</strong>
+                    <span>Browser</span>
+                </div>
+
+                <div class="architecture-arrow">
+                    →
+                </div>
+
+                <div class="architecture-step">
+                    <strong>2</strong>
+                    <span>Local Scanner</span>
+                </div>
+
+                <div class="architecture-arrow">
+                    →
+                </div>
+
+                <div class="architecture-step">
+                    <strong>3</strong>
+                    <span>Risk Engine</span>
+                </div>
+
+                <div class="architecture-arrow">
+                    →
+                </div>
+
+                <div class="architecture-step">
+                    <strong>4</strong>
+                    <span>Local Dashboard</span>
+                </div>
+
+            </div>
+
+            <p class="privacy-note">
+                LockLens is designed to perform core privacy
+                analysis locally in the browser. Raw personal
+                information is not intentionally stored.
+            </p>
+        `;
+    }
+
+    /* =========================================================
+       LOCAL DATA
+       ========================================================= */
+
+    function renderLocalDataInfo(data) {
+        const container =
+            $("localData");
+
+        if (!container) {
+            return;
+        }
+
+        const findings =
+            Array.isArray(
+                data.lockLensFindings
+            )
+                ? data.lockLensFindings.length
+                : 0;
+
+        const events =
+            Array.isArray(
+                data.lockLensExposureEvents
+            )
+                ? data.lockLensExposureEvents.length
+                : 0;
+
+        container.innerHTML = `
+            <div class="local-data-stat">
+                <strong>
+                    ${findings}
+                </strong>
+                <span>
+                    Current findings
+                </span>
+            </div>
+
+            <div class="local-data-stat">
+                <strong>
+                    ${events}
+                </strong>
+                <span>
+                    Timeline events
+                </span>
+            </div>
+
+            <p class="privacy-note">
+                LockLens stores analysis metadata locally
+                for the prototype dashboard.
+            </p>
+        `;
+    }
+
+    /* =========================================================
+       CLEAR LOCAL DATA
+       ========================================================= */
 
     async function clearLocalData() {
         const confirmed =
             window.confirm(
-                "Clear all locally stored LockLens scan, timeline, guard, URL-risk, and explanation data?"
+                "Clear LockLens local analysis data?"
             );
 
         if (!confirmed) {
@@ -1302,130 +1677,184 @@
         }
 
         try {
-            await chrome.storage.local.remove(
-                STORAGE_KEYS
+            await new Promise(
+                (resolve, reject) => {
+                    chrome.storage.local.clear(
+                        () => {
+                            if (
+                                chrome.runtime?.lastError
+                            ) {
+                                reject(
+                                    new Error(
+                                        chrome.runtime.lastError
+                                            .message
+                                    )
+                                );
+
+                                return;
+                            }
+
+                            resolve();
+                        }
+                    );
+                }
             );
 
-            await renderDashboard();
+            window.location.reload();
 
-            window.alert(
-                "LockLens local data has been cleared."
-            );
         } catch (error) {
             console.error(
-                "Failed to clear local data:",
+                "Unable to clear LockLens data:",
                 error
             );
 
             window.alert(
-                "Could not clear local data."
+                "Unable to clear local data."
             );
         }
     }
 
-    // =====================================================
-    // HELPERS
-    // =====================================================
+    /* =========================================================
+       NAVIGATION
+       ========================================================= */
 
-    function formatCategory(
-        category
-    ) {
-        return String(
-            category || ""
-        )
-            .replace(
-                /_/g,
-                " "
-            )
-            .replace(
-                /\b\w/g,
-                (char) =>
-                    char.toUpperCase()
+    function initializeNavigation() {
+        const navItems =
+            document.querySelectorAll(
+                "[data-section]"
             );
+
+        navItems.forEach(
+            (item) => {
+                item.addEventListener(
+                    "click",
+                    () => {
+                        const sectionId =
+                            item.getAttribute(
+                                "data-section"
+                            );
+
+                        if (!sectionId) {
+                            return;
+                        }
+
+                        const target =
+                            document.getElementById(
+                                sectionId
+                            );
+
+                        if (target) {
+                            target.scrollIntoView({
+                                behavior:
+                                    "smooth",
+                                block:
+                                    "start"
+                            });
+                        }
+
+                        navItems.forEach(
+                            (nav) =>
+                                nav.classList.remove(
+                                    "active"
+                                )
+                        );
+
+                        item.classList.add(
+                            "active"
+                        );
+                    }
+                );
+            }
+        );
     }
 
-    function formatDate(
-        timestamp
-    ) {
+    /* =========================================================
+       BUTTONS
+       ========================================================= */
+
+    function initializeButtons() {
+        const clearButton =
+            $("clearLocalData");
+
+        if (clearButton) {
+            clearButton.addEventListener(
+                "click",
+                clearLocalData
+            );
+        }
+
+        const refreshButton =
+            $("refreshDashboard");
+
+        if (refreshButton) {
+            refreshButton.addEventListener(
+                "click",
+                refreshDashboard
+            );
+        }
+    }
+
+    /* =========================================================
+       DASHBOARD REFRESH
+       ========================================================= */
+
+    async function refreshDashboard() {
+        const data =
+            await getStorage(
+                STORAGE_KEYS
+            );
+
+        renderOverview(data);
+        renderNutritionLabel(data);
+        renderCategoryIntelligence(data);
+        renderRiskSources(data);
+        renderExplanation(data);
+        renderCategories(data);
+        renderURLAssessment(data);
+        renderEmailAssessment(data);
+        renderRecommendations(data);
+        renderTimeline(data);
+        renderPrivacyGuard(data);
+        renderDecisionPath(data);
+        renderPrivacyArchitecture();
+        renderLocalDataInfo(data);
+
+        return data;
+    }
+
+    /* =========================================================
+       INITIALIZATION
+       ========================================================= */
+
+    async function initializeDashboard() {
         try {
-            return new Date(
-                timestamp
-            ).toLocaleString();
-        } catch {
-            return "Unknown";
-        }
-    }
+            initializeNavigation();
+            initializeButtons();
 
-    function getRiskLevel(
-        score
-    ) {
-        if (score >= 76) {
-            return "Critical";
-        }
+            await refreshDashboard();
 
-        if (score >= 51) {
-            return "High";
-        }
-
-        if (score >= 21) {
-            return "Medium";
-        }
-
-        return "Low";
-    }
-
-    function getRiskClass(
-        level
-    ) {
-        const normalized =
-            String(
-                level || "unknown"
-            ).toLowerCase();
-
-        if (
-            normalized ===
-            "critical"
-        ) {
-            return "risk-critical";
-        }
-
-        if (
-            normalized ===
-            "high"
-        ) {
-            return "risk-high";
-        }
-
-        if (
-            normalized ===
-            "medium"
-        ) {
-            return "risk-medium";
-        }
-
-        if (
-            normalized ===
-            "low"
-        ) {
-            return "risk-low";
-        }
-
-        return "risk-unknown";
-    }
-
-    function escapeHTML(
-        value
-    ) {
-        const div =
-            document.createElement(
-                "div"
+        } catch (error) {
+            console.error(
+                "LockLens dashboard initialization failed:",
+                error
             );
-
-        div.textContent =
-            String(
-                value ?? ""
-            );
-
-        return div.innerHTML;
+        }
     }
+
+    /* =========================================================
+       START
+       ========================================================= */
+
+    if (
+        document.readyState ===
+        "loading"
+    ) {
+        document.addEventListener(
+            "DOMContentLoaded",
+            initializeDashboard
+        );
+    } else {
+        initializeDashboard();
+    }
+
 })();

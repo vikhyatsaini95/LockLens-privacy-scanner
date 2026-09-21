@@ -20,332 +20,251 @@
 
         body {
             margin: 0;
+
             width: 390px;
-            min-height: 560px;
+
+            min-height: 600px;
+
+            background: #07111f;
+
+            color: #f3f7ff;
 
             font-family:
-                Arial,
-                Helvetica,
+                Inter,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
                 sans-serif;
-
-            background:
-                radial-gradient(
-                    circle at top right,
-                    rgba(0, 255, 200, 0.10),
-                    transparent 35%
-                ),
-                #071018;
-
-            color: #eafcff;
         }
 
         .container {
             padding: 18px;
         }
 
+        /* ================= HEADER ================= */
+
         .header {
             display: flex;
+
             justify-content: space-between;
+
             align-items: center;
 
-            margin-bottom: 14px;
+            margin-bottom: 16px;
+        }
+
+        .brand {
+            display: flex;
+
+            align-items: center;
+
+            gap: 10px;
         }
 
         .logo {
-            font-size: 23px;
-            font-weight: 800;
-            letter-spacing: 1px;
-        }
-
-        .logo span {
-            color: #00e6b8;
-        }
-
-        .status-dot {
-            width: 9px;
-            height: 9px;
-
-            border-radius: 50%;
-
-            background: #00e6b8;
-
-            box-shadow:
-                0 0 12px #00e6b8;
-        }
-
-        .privacy-banner {
-            padding: 12px;
-
-            border: 1px solid
-                rgba(0, 230, 184, 0.25);
-
-            border-radius: 12px;
-
-            background:
-                rgba(0, 230, 184, 0.06);
-
-            color: #bceee4;
-
-            font-size: 12px;
-            line-height: 1.5;
-
-            margin-bottom: 14px;
-        }
-
-        .card {
-            background:
-                rgba(255, 255, 255, 0.035);
-
-            border: 1px solid
-                rgba(255, 255, 255, 0.08);
-
-            border-radius: 15px;
-
-            padding: 15px;
-
-            margin-bottom: 12px;
-        }
-
-        .card-title {
-            margin: 0 0 8px;
-
-            font-size: 14px;
-            font-weight: 700;
-        }
-
-        button {
-            width: 100%;
-
-            border: 0;
-
-            border-radius: 10px;
-
-            padding: 12px;
-
-            margin-top: 10px;
-
-            font-size: 13px;
-            font-weight: 700;
-
-            cursor: pointer;
-
-            transition: 0.2s;
-        }
-
-        button:hover {
-            transform: translateY(-1px);
-        }
-
-        button:disabled {
-            opacity: 0.55;
-
-            cursor: not-allowed;
-
-            transform: none;
-        }
-
-        .primary-button {
-            background: #00e6b8;
-            color: #03120f;
-        }
-
-        .secondary-button,
-        .guard-button {
-            background: #13242d;
-
-            color: #eafcff;
-
-            border: 1px solid #25414c;
-        }
-
-        .guard-button.active {
-            border-color: #00e6b8;
-            color: #00e6b8;
-        }
-
-        .scanner-status {
-            display: flex;
-
-            justify-content: space-between;
-
-            font-size: 11px;
-
-            color: #8da5b0;
-        }
-
-        #scannerStatus {
-            color: #00e6b8;
-            font-weight: 700;
-        }
-
-        #status {
-            min-height: 18px;
-
-            margin-top: 12px;
-
-            color: #a9c0ca;
-
-            font-size: 11px;
-
-            line-height: 1.4;
-        }
-
-        /* --------------------------------
-           URL RISK
-        -------------------------------- */
-
-        #urlRiskPanel {
-            display: none;
-        }
-
-        .url-risk-header {
-            display: flex;
-
-            justify-content: space-between;
-
-            align-items: center;
-
-            margin-bottom: 12px;
-        }
-
-        .url-risk-title {
-            margin: 0;
-
-            font-size: 14px;
-        }
-
-        .url-risk-score {
-            font-size: 22px;
-
-            font-weight: 800;
-
-            color: #00e6b8;
-        }
-
-        .url-risk-level {
-            display: block;
-
-            margin-top: 3px;
-
-            font-size: 11px;
-
-            font-weight: 700;
-        }
-
-        .url-risk-level.low {
-            color: #00e6b8;
-        }
-
-        .url-risk-level.medium {
-            color: #ffd166;
-        }
-
-        .url-risk-level.high {
-            color: #ff9f43;
-        }
-
-        .url-risk-level.critical {
-            color: #ff5c5c;
-        }
-
-        .url-risk-level.unknown {
-            color: #8da5b0;
-        }
-
-        .url-risk-checks {
-            display: grid;
-
-            gap: 7px;
-        }
-
-        .url-check {
-            display: flex;
-
-            gap: 9px;
-
-            align-items: center;
-
-            padding: 9px;
-
-            border-radius: 9px;
-
-            background:
-                rgba(255, 255, 255, 0.025);
-
-            border:
-                1px solid
-                rgba(255, 255, 255, 0.06);
-        }
-
-        .url-check-icon {
-            width: 22px;
-            height: 22px;
+            width: 36px;
+            height: 36px;
 
             display: flex;
 
             align-items: center;
             justify-content: center;
 
-            border-radius: 50%;
+            border-radius: 10px;
 
-            font-size: 12px;
+            background: rgba(94, 231, 255, 0.12);
+
+            border: 1px solid rgba(94, 231, 255, 0.2);
+
+            font-size: 18px;
+        }
+
+        .brand-name {
+            font-size: 17px;
+
             font-weight: 800;
         }
 
-        .url-check.pass .url-check-icon {
-            color: #00e6b8;
+        .brand-subtitle {
+            color: #8296ae;
 
-            background:
-                rgba(0, 230, 184, 0.10);
+            font-size: 10px;
         }
 
-        .url-check.warning .url-check-icon {
-            color: #ffd166;
+        .local-badge {
+            padding: 5px 8px;
 
-            background:
-                rgba(255, 209, 102, 0.10);
-        }
+            border-radius: 6px;
 
-        .url-check strong {
-            display: block;
+            background: rgba(82, 210, 115, 0.1);
 
-            font-size: 11px;
-        }
-
-        .url-check small {
-            display: block;
-
-            margin-top: 2px;
-
-            color: #8da5b0;
+            color: #52d273;
 
             font-size: 9px;
+
+            font-weight: 700;
         }
 
-        .url-recommendation {
-            padding: 8px 10px;
+        /* ================= STATUS ================= */
 
-            margin-top: 5px;
+        .status-card {
+            padding: 14px;
 
-            border-left:
-                2px solid #00e6b8;
+            background: #101d30;
 
-            background:
-                rgba(0, 230, 184, 0.04);
+            border: 1px solid rgba(255,255,255,0.08);
 
-            color: #a9c0ca;
+            border-radius: 12px;
+
+            margin-bottom: 12px;
+        }
+
+        .status-row {
+            display: flex;
+
+            align-items: center;
+
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+
+            border-radius: 50%;
+
+            background: #52d273;
+
+            box-shadow:
+                0 0 8px rgba(82, 210, 115, 0.5);
+        }
+
+        .status-message {
+            color: #9aacc1;
+
+            font-size: 12px;
+        }
+
+        /* ================= RISK ================= */
+
+        .risk-card {
+            padding: 18px;
+
+            background: #101d30;
+
+            border: 1px solid rgba(255,255,255,0.08);
+
+            border-radius: 12px;
+
+            margin-bottom: 12px;
+        }
+
+        .label {
+            color: #8296ae;
+
+            font-size: 9px;
+
+            text-transform: uppercase;
+
+            letter-spacing: 0.08em;
+        }
+
+        .risk-score {
+            margin-top: 7px;
+
+            font-size: 38px;
+
+            line-height: 1;
+
+            font-weight: 800;
+        }
+
+        .risk-level {
+            display: inline-block;
+
+            margin-top: 8px;
+
+            padding: 4px 7px;
+
+            border-radius: 5px;
+
+            background: rgba(94,231,255,0.1);
+
+            color: #5ee7ff;
 
             font-size: 10px;
 
-            line-height: 1.4;
+            font-weight: 700;
         }
 
-        /* --------------------------------
-           EXPLAINABLE RISK
-        -------------------------------- */
+        /* ================= BUTTONS ================= */
 
-        .explanation-summary {
-            color: #b9cbd1;
+        button {
+            width: 100%;
+
+            padding: 11px;
+
+            border-radius: 8px;
+
+            border: 1px solid rgba(255,255,255,0.1);
+
+            background: #122238;
+
+            color: #f3f7ff;
+
+            cursor: pointer;
+
+            font-weight: 700;
+
+            margin-top: 8px;
+
+            transition:
+                background 0.2s ease,
+                border-color 0.2s ease;
+        }
+
+        button:hover {
+            background: #172a43;
+        }
+
+        .primary {
+            background: rgba(94,231,255,0.12);
+
+            color: #5ee7ff;
+
+            border-color:
+                rgba(94,231,255,0.2);
+        }
+
+        .primary:hover {
+            background: rgba(94,231,255,0.18);
+        }
+
+        /* ================= PANELS ================= */
+
+        .panel {
+            margin-top: 12px;
+
+            padding: 15px;
+
+            background: #101d30;
+
+            border: 1px solid rgba(255,255,255,0.08);
+
+            border-radius: 12px;
+        }
+
+        .panel-title {
+            font-size: 13px;
+
+            font-weight: 800;
+
+            margin-bottom: 9px;
+        }
+
+        .panel-description {
+            color: #8296ae;
 
             font-size: 11px;
 
@@ -354,203 +273,581 @@
             margin-bottom: 12px;
         }
 
-        .explanation-title {
-            margin:
-                10px 0 7px;
+        .content {
+            color: #9aacc1;
 
-            color: #00e6b8;
+            font-size: 11px;
+
+            line-height: 1.6;
+        }
+
+        /* ================= NUTRITION ================= */
+
+        .nutrition-summary {
+            color: #9aacc1;
+
+            font-size: 11px;
+
+            line-height: 1.5;
+        }
+
+        .nutrition-score-row {
+            display: flex;
+
+            align-items: center;
+
+            justify-content: space-between;
+
+            margin-top: 10px;
+        }
+
+        .nutrition-score {
+            font-size: 20px;
+
+            font-weight: 800;
+        }
+
+        .nutrition-exposure {
+            color: #8296ae;
 
             font-size: 10px;
+        }
+
+        /* ================= DECISION PATH ================= */
+
+        .decision-card {
+            padding: 10px;
+
+            margin-top: 8px;
+
+            background: #0b1728;
+
+            border: 1px solid rgba(255,255,255,0.07);
+
+            border-radius: 8px;
+        }
+
+        .decision-card:first-child {
+            margin-top: 0;
+        }
+
+        .decision-number {
+            color: #5ee7ff;
+
+            font-size: 9px;
 
             font-weight: 800;
 
-            letter-spacing: 0.5px;
+            text-transform: uppercase;
+
+            letter-spacing: 0.05em;
         }
 
-        .explanation-item {
-            padding: 9px 10px;
+        .decision-title {
+            margin-top: 4px;
 
-            margin-top: 6px;
+            color: #f3f7ff;
 
-            border-radius: 8px;
+            font-size: 12px;
 
-            background:
-                rgba(255, 255, 255, 0.025);
+            font-weight: 750;
+        }
 
-            border-left:
-                2px solid #00e6b8;
+        .decision-question {
+            margin-top: 5px;
 
-            color: #a9c0ca;
+            color: #8296ae;
 
             font-size: 10px;
 
-            line-height: 1.45;
+            line-height: 1.4;
         }
 
+        .decision-answer {
+            margin-top: 7px;
+
+            color: #d4dfed;
+
+            font-size: 11px;
+
+            line-height: 1.5;
+        }
+
+        .decision-status {
+            display: inline-block;
+
+            margin-top: 7px;
+
+            padding: 3px 6px;
+
+            border-radius: 5px;
+
+            background: rgba(94,231,255,0.08);
+
+            color: #5ee7ff;
+
+            font-size: 9px;
+
+            text-transform: capitalize;
+        }
+
+        .category-pill {
+            display: inline-block;
+
+            padding: 4px 7px;
+
+            margin: 3px 3px 0 0;
+
+            border-radius: 5px;
+
+            background: rgba(255,255,255,0.05);
+
+            border: 1px solid rgba(255,255,255,0.07);
+
+            color: #b8c7d9;
+
+            font-size: 9px;
+        }
+
+        /* ================= EMAIL ================= */
+
+        .email-input {
+            width: 100%;
+
+            min-height: 100px;
+
+            resize: vertical;
+
+            padding: 10px;
+
+            border-radius: 8px;
+
+            border: 1px solid rgba(255,255,255,0.1);
+
+            background: #081321;
+
+            color: #f3f7ff;
+
+            outline: none;
+
+            font-family: monospace;
+
+            font-size: 10px;
+        }
+
+        .email-input:focus {
+            border-color:
+                rgba(94,231,255,0.35);
+        }
+
+        /* ================= FOOTER ================= */
+
         .footer {
-            margin-top: 12px;
+            padding: 16px 0 5px;
 
             text-align: center;
 
-            color: #506873;
+            color: #53677f;
 
             font-size: 9px;
+
+            line-height: 1.5;
         }
 
     </style>
 
 </head>
 
+
 <body>
 
-<main class="container">
+<div class="container">
 
-    <header class="header">
 
-        <div class="logo">
-            Lock<span>Lens</span>
-        </div>
+    <!-- =================================================
+         HEADER
+    ================================================== -->
 
-        <div class="status-dot"></div>
+    <div class="header">
 
-    </header>
+        <div class="brand">
 
-    <div class="privacy-banner">
-
-        🔐 <strong>Privacy by Design</strong><br>
-
-        LockLens analyzes page and form
-        structure locally. It does not store
-        typed passwords, personal values,
-        or the actual URL.
-
-    </div>
-
-    <section class="card">
-
-        <div class="scanner-status">
-
-            <span>
-                Scanner Status
-            </span>
-
-            <span id="scannerStatus">
-                Ready
-            </span>
-
-        </div>
-
-        <button
-            id="analyzePage"
-            class="primary-button"
-        >
-            🔍 Analyze This Page
-        </button>
-
-        <button
-            id="privacyGuardButton"
-            class="guard-button"
-        >
-            Privacy Guard: ON
-        </button>
-
-        <button
-            id="dashboardButton"
-            class="secondary-button"
-        >
-            📊 Open Dashboard
-        </button>
-
-        <div id="status">
-            Ready to analyze the current webpage.
-        </div>
-
-    </section>
-
-    <!-- URL RISK -->
-
-    <section
-        id="urlRiskPanel"
-        class="card"
-    >
-
-        <div class="url-risk-header">
+            <div class="logo">
+                🛡
+            </div>
 
             <div>
 
-                <h2 class="url-risk-title">
-                    🌐 URL Risk Analysis
-                </h2>
+                <div class="brand-name">
+                    LockLens
+                </div>
 
-                <span
-                    id="urlRiskLevel"
-                    class="url-risk-level unknown"
-                >
-                    Not analyzed
-                </span>
+                <div class="brand-subtitle">
+                    Privacy Intelligence
+                </div>
 
-            </div>
-
-            <div
-                id="urlRiskScore"
-                class="url-risk-score"
-            >
-                —
             </div>
 
         </div>
 
-        <div
-            id="urlRiskChecks"
-            class="url-risk-checks"
-        ></div>
 
-        <div
-            id="urlRiskRecommendations"
-        ></div>
-
-    </section>
-
-    <!-- EXPLAINABLE RISK -->
-
-    <section
-        id="explanationPanel"
-        class="card"
-        style="display:none;"
-    >
-
-        <div class="card-title">
-            🧠 Why This Risk?
+        <div class="local-badge">
+            LOCAL ANALYSIS
         </div>
 
-        <div
-            id="explanationSummary"
-            class="explanation-summary"
-        ></div>
-
-        <div
-            id="explanationReasons"
-        ></div>
-
-        <div
-            id="explanationActions"
-        ></div>
-
-    </section>
-
-    <div class="footer">
-        LockLens • Local Privacy & Exposure Protection
     </div>
 
-</main>
+
+    <!-- =================================================
+         STATUS
+    ================================================== -->
+
+    <div class="status-card">
+
+        <div class="status-row">
+
+            <span
+                id="statusDot"
+                class="status-dot"
+            ></span>
+
+            <span
+                id="statusMessage"
+                class="status-message"
+            >
+                Ready to analyze.
+            </span>
+
+        </div>
+
+    </div>
+
+
+    <!-- =================================================
+         RISK SUMMARY
+    ================================================== -->
+
+    <div class="risk-card">
+
+        <div class="label">
+            Current Privacy Risk
+        </div>
+
+
+        <div
+            id="riskScore"
+            class="risk-score"
+        >
+            --
+        </div>
+
+
+        <div
+            id="riskLevel"
+            class="risk-level"
+        >
+            No analysis
+        </div>
+
+
+        <div
+            id="riskSummary"
+            class="content"
+            style="margin-top:8px;"
+        >
+            Analyze the current page.
+        </div>
+
+    </div>
+
+
+    <!-- =================================================
+         ANALYZE PAGE
+    ================================================== -->
+
+    <button
+        id="analyzeButton"
+        class="primary"
+    >
+        Analyze This Page
+    </button>
+
+
+    <!-- =================================================
+         PRIVACY GUARD
+    ================================================== -->
+
+    <div class="panel">
+
+        <div class="panel-title">
+            Privacy Guard
+        </div>
+
+
+        <div class="content">
+
+            <label>
+
+                <input
+                    id="privacyGuardToggle"
+                    type="checkbox"
+                >
+
+                Enable proactive privacy warnings
+
+            </label>
+
+        </div>
+
+
+        <button
+            id="privacyGuardButton"
+        >
+            Privacy Guard
+        </button>
+
+    </div>
+
+
+    <!-- =================================================
+         PRIVACY NUTRITION LABEL
+    ================================================== -->
+
+    <div class="panel">
+
+        <div class="panel-title">
+            Privacy Nutrition Label
+        </div>
+
+
+        <div
+            id="privacyNutritionLabel"
+            class="nutrition-summary"
+        >
+            No privacy label available.
+        </div>
+
+
+        <div class="nutrition-score-row">
+
+            <div>
+
+                <div class="label">
+                    Risk Score
+                </div>
+
+                <div
+                    id="nutritionScore"
+                    class="nutrition-score"
+                >
+                    --
+                </div>
+
+            </div>
+
+
+            <div
+                id="nutritionExposure"
+                class="nutrition-exposure"
+            >
+                No analysis
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =================================================
+         URL RISK
+    ================================================== -->
+
+    <div class="panel">
+
+        <div class="panel-title">
+            URL Risk Analysis
+        </div>
+
+
+        <div
+            id="urlRiskContent"
+            class="content"
+        >
+            No URL analysis available.
+        </div>
+
+    </div>
+
+
+    <!-- =================================================
+         EXPLAINABLE RISK
+    ================================================== -->
+
+    <div class="panel">
+
+        <div class="panel-title">
+            Why This Risk?
+        </div>
+
+
+        <div
+            id="explanationContent"
+            class="content"
+        >
+            No explanation available.
+        </div>
+
+    </div>
+
+
+    <!-- =================================================
+         STEP 17
+         PRIVACY DECISION PATH
+    ================================================== -->
+
+    <div class="panel">
+
+        <div class="panel-title">
+            Privacy Decision Path
+        </div>
+
+
+        <div class="panel-description">
+
+            LockLens explains the detected signals and
+            presents questions to help you make your
+            own privacy decision.
+
+        </div>
+
+
+        <div
+            id="decisionPathContent"
+        >
+
+            <div class="content">
+                Analyze a page to generate a privacy
+                decision path.
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =================================================
+         EMAIL HEADER ANALYZER
+    ================================================== -->
+
+    <div class="panel">
+
+        <div class="panel-title">
+            Email Header Analyzer
+        </div>
+
+
+        <div class="panel-description">
+
+            Paste test email headers for local metadata
+            analysis. Raw headers are not stored.
+
+        </div>
+
+
+        <textarea
+            id="emailHeadersInput"
+            class="email-input"
+            placeholder="Paste test email headers here..."
+        ></textarea>
+
+
+        <button
+            id="analyzeEmailButton"
+        >
+            Analyze Email Headers
+        </button>
+
+
+        <button
+            id="clearEmailButton"
+        >
+            Clear Email
+        </button>
+
+
+        <div
+            id="emailResult"
+            class="content"
+            style="margin-top:10px;"
+        >
+            No email analysis available.
+        </div>
+
+    </div>
+
+
+    <!-- =================================================
+         DASHBOARD
+    ================================================== -->
+
+    <button
+        id="dashboardButton"
+    >
+        Open Dashboard
+    </button>
+
+
+    <button
+        id="openDashboardButton"
+    >
+        Open Privacy Dashboard
+    </button>
+
+
+    <!-- =================================================
+         FOOTER
+    ================================================== -->
+
+    <div class="footer">
+
+        LockLens processes core privacy analysis locally.
+
+    </div>
+
+
+</div>
+
+
+<!-- =====================================================
+     LOCKLENS SCRIPT PIPELINE
+
+     IMPORTANT:
+     Dependencies are loaded first.
+     popup.js is loaded LAST.
+===================================================== -->
 
 <script src="scripts/scanner.js"></script>
+
 <script src="scripts/riskEngine.js"></script>
+
 <script src="scripts/recommendationEngine.js"></script>
+
 <script src="scripts/timeline.js"></script>
+
 <script src="scripts/urlRiskInspector.js"></script>
+
 <script src="scripts/explanationEngine.js"></script>
+
+<script src="scripts/emailHeaderAnalyzer.js"></script>
+
+<script src="scripts/privacyLabelEngine.js"></script>
+
+<!-- STEP 17 -->
+<script src="scripts/privacyDecisionEngine.js"></script>
+
+<!-- Main popup controller MUST be last -->
 <script src="popup.js"></script>
+
 
 </body>
 

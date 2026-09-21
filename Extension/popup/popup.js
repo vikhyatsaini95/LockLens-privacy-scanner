@@ -1,1106 +1,1720 @@
+/* =========================================================
+   LockLens Popup Controller
+   Step 18 - Complete Integration
+   ========================================================= */
+
 (() => {
     "use strict";
 
-    const RESTRICTED_PROTOCOLS = [
-        "chrome:",
-        "edge:",
-        "about:",
-        "chrome-extension:",
-        "brave:"
-    ];
+    /* =========================================================
+       STATE
+       ========================================================= */
 
-    const elements = {
-        analyzeButton:
-            document.getElementById("analyzePage"),
+    let currentFindings = [];
+    let currentPageRisk = null;
+    let currentUnifiedRisk = null;
+    let currentURLRisk = null;
+    let currentEmailRisk = null;
+    let currentRecommendations = null;
+    let currentExplanation = null;
+    let currentPrivacyLabel = null;
+    let currentDecisionPath = null;
 
-        privacyGuardButton:
-            document.getElementById("privacyGuardButton"),
+    /* =========================================================
+       DOM HELPERS
+       ========================================================= */
 
-        dashboardButton:
-            document.getElementById("dashboardButton"),
+    function $(id) {
+        return document.getElementById(id);
+    }
 
-        status:
-            document.getElementById("status"),
+    function setText(id, value) {
+        const element = $(id);
 
-        scannerStatus:
-            document.getElementById("scannerStatus"),
-
-        urlPanel:
-            document.getElementById("urlRiskPanel"),
-
-        urlScore:
-            document.getElementById("urlRiskScore"),
-
-        urlLevel:
-            document.getElementById("urlRiskLevel"),
-
-        urlChecks:
-            document.getElementById("urlRiskChecks"),
-
-        urlRecommendations:
-            document.getElementById(
-                "urlRiskRecommendations"
-            ),
-
-        explanationPanel:
-            document.getElementById(
-                "explanationPanel"
-            ),
-
-        explanationSummary:
-            document.getElementById(
-                "explanationSummary"
-            ),
-
-        explanationReasons:
-            document.getElementById(
-                "explanationReasons"
-            ),
-
-        explanationActions:
-            document.getElementById(
-                "explanationActions"
-            )
-    };
-
-    document.addEventListener(
-        "DOMContentLoaded",
-        init
-    );
-
-    async function init() {
-        try {
-            await loadPrivacyGuardState();
-            await loadPreviousResults();
-
-            if (elements.analyzeButton) {
-                elements.analyzeButton.addEventListener(
-                    "click",
-                    analyzeCurrentPage
-                );
-            }
-
-            if (elements.privacyGuardButton) {
-                elements.privacyGuardButton.addEventListener(
-                    "click",
-                    togglePrivacyGuard
-                );
-            }
-
-            if (elements.dashboardButton) {
-                elements.dashboardButton.addEventListener(
-                    "click",
-                    openDashboard
-                );
-            }
-
-            setScannerStatus("Ready");
-        } catch (error) {
-            console.error(
-                "LockLens initialization error:",
-                error
-            );
-
-            setStatus(
-                "Initialization error."
-            );
+        if (element) {
+            element.textContent = value ?? "";
         }
     }
 
-    // =====================================================
-    // ACTIVE TAB
-    // =====================================================
-
-    async function getActiveTab() {
-        const tabs =
-            await chrome.tabs.query({
-                active: true,
-                currentWindow: true
-            });
-
-        return tabs[0];
+    function escapeHTML(value) {
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 
-    function isRestrictedPage(url) {
-        if (!url) {
-            return true;
-        }
+    function showMessage(message, type = "info") {
+        const statusMessage = $("statusMessage");
 
-        try {
-            const parsed = new URL(url);
-
-            return RESTRICTED_PROTOCOLS.includes(
-                parsed.protocol
-            );
-        } catch {
-            return true;
-        }
-    }
-
-    // =====================================================
-    // MAIN ANALYSIS
-    // =====================================================
-
-    async function analyzeCurrentPage() {
-        if (!elements.analyzeButton) {
+        if (!statusMessage) {
             return;
         }
 
-        elements.analyzeButton.disabled = true;
+        statusMessage.textContent = message;
 
-        setStatus(
-            "Analyzing page..."
-        );
+        statusMessage.className = `status-message ${type}`;
+    }
 
-        setScannerStatus(
-            "Scanning"
-        );
+    function setStatus(active, message) {
+        const dot = $("statusDot");
 
-        try {
-            const tab =
-                await getActiveTab();
+        if (dot) {
+            dot.className = active
+                ? "status-dot active"
+                : "status-dot";
+        }
 
-            if (!tab || !tab.id) {
-                throw new Error(
-                    "Active tab could not be found."
-                );
-            }
+        setText("statusMessage", message);
+    }
 
-            // ---------------------------------------------
-            // URL ANALYSIS
-            // ---------------------------------------------
+    /* =========================================================
+       CHROME STORAGE HELPERS
+       ========================================================= */
 
-            await analyzeURL(tab.url);
-
-            if (isRestrictedPage(tab.url)) {
-                setStatus(
-                    "This page cannot be analyzed. Open a normal HTTP/HTTPS webpage."
-                );
-
-                setScannerStatus(
-                    "Unavailable"
-                );
-
+    function storageGet(keys) {
+        return new Promise((resolve) => {
+            if (
+                typeof chrome === "undefined" ||
+                !chrome.storage ||
+                !chrome.storage.local
+            ) {
+                resolve({});
                 return;
             }
 
-            // ---------------------------------------------
-            // CHECK SCANNER
-            // ---------------------------------------------
-
-            let scannerAvailable = false;
-
-            try {
-                const result =
-                    await chrome.scripting.executeScript({
-                        target: {
-                            tabId: tab.id
-                        },
-
-                        func: () => {
-                            return Boolean(
-                                window.LockLensScanner
-                            );
-                        }
-                    });
-
-                scannerAvailable =
-                    Boolean(
-                        result?.[0]?.result
+            chrome.storage.local.get(keys, (result) => {
+                if (chrome.runtime?.lastError) {
+                    console.warn(
+                        "LockLens storage get error:",
+                        chrome.runtime.lastError.message
                     );
-            } catch (error) {
-                console.warn(
-                    "Scanner check failed:",
-                    error
-                );
+
+                    resolve({});
+                    return;
+                }
+
+                resolve(result || {});
+            });
+        });
+    }
+
+    function storageSet(data) {
+        return new Promise((resolve) => {
+            if (
+                typeof chrome === "undefined" ||
+                !chrome.storage ||
+                !chrome.storage.local
+            ) {
+                resolve(false);
+                return;
             }
 
-            // ---------------------------------------------
-            // INJECT SCANNER IF REQUIRED
-            // ---------------------------------------------
+            chrome.storage.local.set(data, () => {
+                if (chrome.runtime?.lastError) {
+                    console.warn(
+                        "LockLens storage set error:",
+                        chrome.runtime.lastError.message
+                    );
 
-            if (!scannerAvailable) {
-                await chrome.scripting.executeScript({
+                    resolve(false);
+                    return;
+                }
+
+                resolve(true);
+            });
+        });
+    }
+
+    function storageRemove(keys) {
+        return new Promise((resolve) => {
+            if (
+                typeof chrome === "undefined" ||
+                !chrome.storage ||
+                !chrome.storage.local
+            ) {
+                resolve(false);
+                return;
+            }
+
+            chrome.storage.local.remove(keys, () => {
+                if (chrome.runtime?.lastError) {
+                    console.warn(
+                        "LockLens storage remove error:",
+                        chrome.runtime.lastError.message
+                    );
+
+                    resolve(false);
+                    return;
+                }
+
+                resolve(true);
+            });
+        });
+    }
+
+    /* =========================================================
+       TAB HELPERS
+       ========================================================= */
+
+    function getCurrentTab() {
+        return new Promise((resolve) => {
+            if (
+                typeof chrome === "undefined" ||
+                !chrome.tabs
+            ) {
+                resolve(null);
+                return;
+            }
+
+            chrome.tabs.query(
+                {
+                    active: true,
+                    currentWindow: true
+                },
+                (tabs) => {
+                    if (chrome.runtime?.lastError) {
+                        console.warn(
+                            "LockLens tab query error:",
+                            chrome.runtime.lastError.message
+                        );
+
+                        resolve(null);
+                        return;
+                    }
+
+                    resolve(tabs && tabs.length > 0 ? tabs[0] : null);
+                }
+            );
+        });
+    }
+
+    /* =========================================================
+       SCRIPT INJECTION
+       ========================================================= */
+
+    async function injectScanner(tabId) {
+        if (
+            typeof chrome === "undefined" ||
+            !chrome.scripting ||
+            !chrome.scripting.executeScript
+        ) {
+            throw new Error(
+                "Chrome scripting API is unavailable."
+            );
+        }
+
+        await new Promise((resolve, reject) => {
+            chrome.scripting.executeScript(
+                {
                     target: {
-                        tabId: tab.id
+                        tabId: tabId
                     },
-
                     files: [
                         "scripts/scanner.js"
                     ]
-                });
-            }
-
-            // ---------------------------------------------
-            // RUN SCANNER
-            // ---------------------------------------------
-
-            const scanResult =
-                await chrome.scripting.executeScript({
-                    target: {
-                        tabId: tab.id
-                    },
-
-                    func: () => {
-                        if (
-                            !window.LockLensScanner ||
-                            typeof
-                                window.LockLensScanner
-                                    .performFullScan !==
-                                "function"
-                        ) {
-                            throw new Error(
-                                "LockLens scanner is not available."
-                            );
-                        }
-
-                        const rawFindings =
-                            window.LockLensScanner
-                                .performFullScan(
-                                    document
-                                );
-
-                        if (
-                            typeof
-                                window.LockLensScanner
-                                    .deduplicateFindings ===
-                                "function"
-                        ) {
-                            return window.LockLensScanner
-                                .deduplicateFindings(
-                                    rawFindings
-                                );
-                        }
-
-                        return rawFindings;
+                },
+                () => {
+                    if (chrome.runtime?.lastError) {
+                        reject(
+                            new Error(
+                                chrome.runtime.lastError.message
+                            )
+                        );
+                        return;
                     }
-                });
 
-            const findings =
-                scanResult?.[0]?.result || [];
+                    resolve();
+                }
+            );
+        });
+    }
 
-            // ---------------------------------------------
-            // RISK ENGINE
-            // ---------------------------------------------
+    /* =========================================================
+       RUN SCANNER
+       ========================================================= */
 
-            let risk;
+    async function runScanner(tab) {
+        if (!tab || !tab.id) {
+            throw new Error(
+                "No active browser tab was found."
+            );
+        }
 
-            if (
-                window.LockLensRiskEngine &&
-                typeof
-                    window.LockLensRiskEngine
-                        .calculateRisk ===
-                        "function"
-            ) {
-                risk =
-                    window.LockLensRiskEngine
-                        .calculateRisk(
-                            findings
+        await injectScanner(tab.id);
+
+        const result = await new Promise(
+            (resolve, reject) => {
+                chrome.scripting.executeScript(
+                    {
+                        target: {
+                            tabId: tab.id
+                        },
+                        func: () => {
+                            try {
+                                if (
+                                    !window.LockLensScanner ||
+                                    typeof window.LockLensScanner
+                                        .performFullScan !== "function"
+                                ) {
+                                    return {
+                                        success: false,
+                                        error:
+                                            "LockLensScanner is not available on this page."
+                                    };
+                                }
+
+                                const findings =
+                                    window.LockLensScanner.performFullScan(
+                                        document
+                                    );
+
+                                return {
+                                    success: true,
+                                    findings:
+                                        Array.isArray(findings)
+                                            ? findings
+                                            : []
+                                };
+                            } catch (error) {
+                                return {
+                                    success: false,
+                                    error:
+                                        error?.message ||
+                                        "Scanner execution failed."
+                                };
+                            }
+                        }
+                    },
+                    (results) => {
+                        if (chrome.runtime?.lastError) {
+                            reject(
+                                new Error(
+                                    chrome.runtime.lastError.message
+                                )
+                            );
+                            return;
+                        }
+
+                        if (
+                            !results ||
+                            !results.length
+                        ) {
+                            reject(
+                                new Error(
+                                    "Scanner returned no result."
+                                )
+                            );
+                            return;
+                        }
+
+                        resolve(
+                            results[0].result
                         );
-            } else {
-                risk =
-                    calculateFallbackRisk(
-                        findings
-                    );
-            }
-
-            // ---------------------------------------------
-            // RECOMMENDATIONS
-            // ---------------------------------------------
-
-            let recommendations = null;
-
-            if (
-                window.LockLensRecommendations &&
-                typeof
-                    window.LockLensRecommendations
-                        .generateRecommendations ===
-                        "function"
-            ) {
-                recommendations =
-                    window.LockLensRecommendations
-                        .generateRecommendations(
-                            findings,
-                            risk
-                        );
-            }
-
-            // ---------------------------------------------
-            // GET URL METADATA
-            // ---------------------------------------------
-
-            const urlData =
-                await chrome.storage.local.get(
-                    "lockLensURLRisk"
+                    }
                 );
-
-            const urlRisk =
-                urlData.lockLensURLRisk ||
-                null;
-
-            // ---------------------------------------------
-            // EXPLANATION ENGINE
-            // ---------------------------------------------
-
-            let explanation = null;
-
-            if (
-                window.LockLensExplanation &&
-                typeof
-                    window.LockLensExplanation
-                        .generateExplanation ===
-                        "function"
-            ) {
-                explanation =
-                    window.LockLensExplanation
-                        .generateExplanation(
-                            findings,
-                            risk,
-                            urlRisk
-                        );
             }
+        );
 
-            // ---------------------------------------------
-            // SAVE RESULTS
-            // ---------------------------------------------
-
-            await chrome.storage.local.set({
-                lockLensFindings:
-                    findings,
-
-                lockLensRisk:
-                    risk,
-
-                lockLensRecommendations:
-                    recommendations,
-
-                lockLensExplanation:
-                    explanation,
-
-                lockLensLastScan: {
-                    timestamp:
-                        Date.now(),
-
-                    findingCount:
-                        findings.length
-                }
-            });
-
-            // ---------------------------------------------
-            // TIMELINE
-            // ---------------------------------------------
-
-            if (
-                window.LockLensTimeline &&
-                typeof
-                    window.LockLensTimeline
-                        .securelyRecordExposure ===
-                        "function"
-            ) {
-                try {
-                    await window.LockLensTimeline
-                        .securelyRecordExposure(
-                            findings,
-                            risk
-                        );
-                } catch (error) {
-                    console.warn(
-                        "Timeline recording failed:",
-                        error
-                    );
-                }
-            }
-
-            // ---------------------------------------------
-            // DISPLAY EXPLANATION
-            // ---------------------------------------------
-
-            renderExplanation(
-                explanation
+        if (!result?.success) {
+            throw new Error(
+                result?.error ||
+                "Unable to scan this page."
             );
-
-            setStatus(
-                findings.length > 0
-                    ? `Analysis complete. ${findings.length} exposure signal(s) detected.`
-                    : "Analysis complete. No exposure signals detected."
-            );
-
-            setScannerStatus(
-                "Complete"
-            );
-        } catch (error) {
-            console.error(
-                "Page analysis failed:",
-                error
-            );
-
-            setStatus(
-                "Analysis failed: " +
-                    (
-                        error.message ||
-                        "Unknown error."
-                    )
-            );
-
-            setScannerStatus(
-                "Error"
-            );
-        } finally {
-            elements.analyzeButton.disabled =
-                false;
         }
+
+        return Array.isArray(result.findings)
+            ? result.findings
+            : [];
     }
 
-    // =====================================================
-    // URL RISK
-    // =====================================================
+    /* =========================================================
+       FINDING NORMALIZATION
+       ========================================================= */
 
-    async function analyzeURL(url) {
-        if (!elements.urlPanel) {
-            return;
+    function normalizeFindings(findings) {
+        if (!Array.isArray(findings)) {
+            return [];
         }
 
-        try {
-            if (
-                !window.LockLensURLInspector ||
-                typeof
-                    window.LockLensURLInspector
-                        .analyzeURL !==
-                        "function"
-            ) {
-                return;
-            }
+        return findings
+            .map((finding) => {
+                if (typeof finding === "string") {
+                    return {
+                        category: finding
+                    };
+                }
 
-            const result =
-                window.LockLensURLInspector
-                    .analyzeURL(url);
+                if (!finding || typeof finding !== "object") {
+                    return null;
+                }
 
-            renderURLRisk(result);
-
-            /*
-             * IMPORTANT:
-             * The actual URL is never stored.
-             */
-
-            const anonymousURLRisk =
-                result
-                    ? {
-                          score:
-                              result.score,
-
-                          level:
-                              result.level,
-
-                          checks: {
-                              https:
-                                  Boolean(
-                                      result.checks?.https
-                                  ),
-
-                              ipAddress:
-                                  Boolean(
-                                      result.checks?.ipAddress
-                                  ),
-
-                              longUrl:
-                                  Boolean(
-                                      result.checks?.longUrl
-                                  ),
-
-                              manySubdomains:
-                                  Boolean(
-                                      result.checks?.manySubdomains
-                                  ),
-
-                              suspiciousCharacters:
-                                  Array.isArray(
-                                      result.checks
-                                          ?.suspiciousCharacters
-                                  )
-                                      ? result.checks
-                                            .suspiciousCharacters
-                                            .length
-                                      : 0,
-
-                              suspiciousPort:
-                                  Boolean(
-                                      result.checks
-                                          ?.suspiciousPort
-                                  ),
-
-                              usernameInUrl:
-                                  Boolean(
-                                      result.checks
-                                          ?.usernameInUrl
-                                  ),
-
-                              urlShortener:
-                                  Boolean(
-                                      result.checks
-                                          ?.urlShortener
-                                  ),
-
-                              encodedUrl:
-                                  Boolean(
-                                      result.checks
-                                          ?.encodedUrl
-                                  )
-                          },
-
-                          timestamp:
-                              Date.now()
-                      }
-                    : null;
-
-            await chrome.storage.local.set({
-                lockLensURLRisk:
-                    anonymousURLRisk
-            });
-        } catch (error) {
-            console.error(
-                "URL analysis failed:",
-                error
-            );
-
-            await chrome.storage.local.set({
-                lockLensURLRisk:
-                    null
-            });
-        }
-    }
-
-    function renderURLRisk(result) {
-        if (!elements.urlPanel) {
-            return;
-        }
-
-        elements.urlPanel.style.display =
-            "block";
-
-        if (!result) {
-            if (elements.urlScore) {
-                elements.urlScore.textContent =
-                    "—";
-            }
-
-            if (elements.urlLevel) {
-                elements.urlLevel.textContent =
-                    "Unavailable";
-            }
-
-            return;
-        }
-
-        if (elements.urlScore) {
-            elements.urlScore.textContent =
-                `${result.score}/100`;
-        }
-
-        if (elements.urlLevel) {
-            elements.urlLevel.textContent =
-                result.level ||
-                "Unknown";
-
-            elements.urlLevel.className =
-                `url-risk-level ${String(
-                    result.level ||
+                return {
+                    ...finding,
+                    category:
+                        finding.category ||
+                        finding.type ||
+                        finding.name ||
                         "unknown"
-                ).toLowerCase()}`;
-        }
-
-        if (elements.urlChecks) {
-            elements.urlChecks.innerHTML =
-                "";
-
-            const checks =
-                result.checks || {};
-
-            addURLCheck(
-                checks.https,
-                "HTTPS",
-                "Secure connection",
-                "HTTPS not detected"
-            );
-
-            addURLCheck(
-                !checks.ipAddress,
-                "IP Address",
-                "Domain name used",
-                "IP address used"
-            );
-
-            addURLCheck(
-                !checks.longUrl,
-                "URL Length",
-                "Normal length",
-                "Unusually long URL"
-            );
-
-            addURLCheck(
-                !checks.manySubdomains,
-                "Subdomains",
-                "Normal structure",
-                "Many subdomains"
-            );
-
-            addURLCheck(
-                !(
-                    Array.isArray(
-                        checks.suspiciousCharacters
-                    ) &&
-                    checks.suspiciousCharacters
-                        .length > 0
-                ),
-                "Characters",
-                "No suspicious characters",
-                "Suspicious characters detected"
-            );
-
-            addURLCheck(
-                !checks.suspiciousPort,
-                "Port",
-                "No unusual port",
-                "Unusual port detected"
-            );
-
-            addURLCheck(
-                !checks.usernameInUrl,
-                "Username",
-                "No username in URL",
-                "Username embedded in URL"
-            );
-
-            addURLCheck(
-                !checks.urlShortener,
-                "URL Shortener",
-                "No common shortener",
-                "Shortened URL detected"
-            );
-
-            addURLCheck(
-                !checks.encodedUrl,
-                "Encoding",
-                "No unusual encoding",
-                "Encoded URL content detected"
-            );
-        }
-
-        if (
-            elements.urlRecommendations
-        ) {
-            elements.urlRecommendations.innerHTML =
-                "";
-
-            (
-                result.recommendations ||
-                []
-            ).forEach(
-                (recommendation) => {
-                    const div =
-                        document.createElement(
-                            "div"
-                        );
-
-                    div.className =
-                        "url-recommendation";
-
-                    div.textContent =
-                        recommendation;
-
-                    elements.urlRecommendations
-                        .appendChild(div);
-                }
-            );
-        }
+                };
+            })
+            .filter(Boolean);
     }
 
-    function addURLCheck(
-        passed,
-        title,
-        successText,
-        warningText
-    ) {
-        if (!elements.urlChecks) {
-            return;
-        }
+    /* =========================================================
+       PAGE RISK
+       ========================================================= */
 
-        const div =
-            document.createElement(
-                "div"
+    function calculatePageRisk(findings) {
+        if (
+            !window.LockLensRiskEngine ||
+            typeof window.LockLensRiskEngine
+                .calculatePageRisk !== "function"
+        ) {
+            console.warn(
+                "LockLensRiskEngine.calculatePageRisk unavailable."
             );
 
-        div.className =
-            `url-check ${
-                passed
-                    ? "pass"
-                    : "warning"
-            }`;
+            return {
+                score: 0,
+                level: "Low",
+                categories: [],
+                findingCount: findings.length
+            };
+        }
 
-        div.innerHTML = `
-            <span class="url-check-icon">
-                ${passed ? "✓" : "⚠"}
-            </span>
-
-            <div>
-                <strong>
-                    ${escapeHTML(title)}
-                </strong>
-
-                <small>
-                    ${escapeHTML(
-                        passed
-                            ? successText
-                            : warningText
-                    )}
-                </small>
-            </div>
-        `;
-
-        elements.urlChecks.appendChild(
-            div
+        return window.LockLensRiskEngine.calculatePageRisk(
+            findings
         );
     }
 
-    // =====================================================
-    // EXPLANATION
-    // =====================================================
+    /* =========================================================
+       URL RISK
+       ========================================================= */
 
-    function renderExplanation(
-        explanation
-    ) {
+    function calculateURLRisk(tab) {
         if (
-            !elements.explanationPanel
+            !tab ||
+            !tab.url ||
+            !window.LockLensURLInspector ||
+            typeof window.LockLensURLInspector
+                .analyzeURL !== "function"
         ) {
+            return null;
+        }
+
+        try {
+            return window.LockLensURLInspector.analyzeURL(
+                tab.url
+            );
+        } catch (error) {
+            console.warn(
+                "LockLens URL analysis failed:",
+                error
+            );
+
+            return null;
+        }
+    }
+
+    /* =========================================================
+       UNIFIED RISK
+       ========================================================= */
+
+    function calculateUnifiedRisk({
+        findings,
+        urlRisk,
+        emailRisk
+    }) {
+        if (
+            !window.LockLensRiskEngine ||
+            typeof window.LockLensRiskEngine
+                .calculateUnifiedRisk !== "function"
+        ) {
+            return currentPageRisk;
+        }
+
+        try {
+            return window.LockLensRiskEngine.calculateUnifiedRisk(
+                {
+                    findings: findings,
+                    urlRisk: urlRisk,
+                    emailRisk: emailRisk
+                }
+            );
+        } catch (error) {
+            console.warn(
+                "Unified risk calculation failed:",
+                error
+            );
+
+            return currentPageRisk;
+        }
+    }
+
+    /* =========================================================
+       RENDER MAIN RISK
+       ========================================================= */
+
+    function renderRisk(risk) {
+        if (!risk) {
+            setText("riskScore", "0");
+            setText("riskLevel", "Low");
+            setText(
+                "riskSummary",
+                "No risk assessment available yet."
+            );
+            return;
+        }
+
+        const score = Number(risk.score) || 0;
+        const level = risk.level || "Low";
+
+        setText(
+            "riskScore",
+            String(Math.round(score))
+        );
+
+        setText(
+            "riskLevel",
+            level
+        );
+
+        let summary =
+            "No significant privacy signals detected.";
+
+        if (level === "Medium") {
+            summary =
+                "Some privacy signals were detected. Review the requested information.";
+        }
+
+        if (level === "High") {
+            summary =
+                "Several privacy-sensitive signals were detected. Review before continuing.";
+        }
+
+        if (level === "Critical") {
+            summary =
+                "Multiple high-sensitivity privacy signals were detected. Review carefully before continuing.";
+        }
+
+        setText(
+            "riskSummary",
+            summary
+        );
+    }
+
+    /* =========================================================
+       PRIVACY NUTRITION LABEL
+       ========================================================= */
+
+    function generatePrivacyLabel() {
+        if (
+            !window.LockLensPrivacyLabel ||
+            typeof window.LockLensPrivacyLabel
+                .generateLabel !== "function"
+        ) {
+            return null;
+        }
+
+        try {
+            return window.LockLensPrivacyLabel.generateLabel(
+                {
+                    findings: currentFindings,
+                    risk: currentUnifiedRisk,
+                    urlRisk: currentURLRisk,
+                    emailRisk: currentEmailRisk
+                }
+            );
+        } catch (error) {
+            console.warn(
+                "Privacy label generation failed:",
+                error
+            );
+
+            return null;
+        }
+    }
+
+    function renderPrivacyLabel(label) {
+        if (!label) {
+            return;
+        }
+
+        const score =
+            label.risk?.score ??
+            currentUnifiedRisk?.score ??
+            0;
+
+        const exposure =
+            label.exposureSummary ||
+            "No sensitive information detected.";
+
+        setText(
+            "nutritionScore",
+            String(Math.round(Number(score) || 0))
+        );
+
+        setText(
+            "nutritionExposure",
+            exposure
+        );
+
+        const container =
+            $("privacyNutritionLabel");
+
+        if (!container) {
+            return;
+        }
+
+        const groups =
+            Array.isArray(label.requestGroups)
+                ? label.requestGroups
+                : [];
+
+        if (groups.length === 0) {
+            return;
+        }
+
+        const existing =
+            container.querySelector(
+                ".popup-nutrition-groups"
+            );
+
+        if (existing) {
+            existing.remove();
+        }
+
+        const wrapper =
+            document.createElement("div");
+
+        wrapper.className =
+            "popup-nutrition-groups";
+
+        wrapper.innerHTML = groups
+            .map((group) => {
+                const name =
+                    escapeHTML(
+                        group.name ||
+                        group.group ||
+                        "Privacy category"
+                    );
+
+                return `
+                    <span class="category-pill">
+                        ${name}
+                    </span>
+                `;
+            })
+            .join("");
+
+        container.appendChild(wrapper);
+    }
+
+    /* =========================================================
+       EXPLANATION ENGINE
+       ========================================================= */
+
+    function generateExplanation() {
+        if (
+            !window.LockLensExplanation ||
+            typeof window.LockLensExplanation
+                .generateExplanation !== "function"
+        ) {
+            return null;
+        }
+
+        try {
+            return window.LockLensExplanation.generateExplanation(
+                currentFindings,
+                currentUnifiedRisk,
+                currentURLRisk
+            );
+        } catch (error) {
+            console.warn(
+                "Explanation generation failed:",
+                error
+            );
+
+            return null;
+        }
+    }
+
+    function renderExplanation(explanation) {
+        const container =
+            $("explanationContent");
+
+        if (!container) {
             return;
         }
 
         if (!explanation) {
-            elements.explanationPanel.style.display =
-                "none";
+            container.textContent =
+                "Explanation will appear after analysis.";
+            return;
+        }
+
+        if (typeof explanation === "string") {
+            container.textContent =
+                explanation;
+            return;
+        }
+
+        const reasons =
+            Array.isArray(explanation.reasons)
+                ? explanation.reasons
+                : Array.isArray(explanation.factors)
+                    ? explanation.factors
+                    : [];
+
+        const summary =
+            explanation.summary ||
+            explanation.explanation ||
+            explanation.message ||
+            "";
+
+        let html = "";
+
+        if (summary) {
+            html += `
+                <div class="explanation-summary">
+                    ${escapeHTML(summary)}
+                </div>
+            `;
+        }
+
+        if (reasons.length > 0) {
+            html += `
+                <ul class="explanation-list">
+                    ${reasons
+                        .map(
+                            (reason) => `
+                            <li>
+                                ${escapeHTML(
+                                    typeof reason === "string"
+                                        ? reason
+                                        : reason.message ||
+                                          reason.reason ||
+                                          reason.title ||
+                                          JSON.stringify(reason)
+                                )}
+                            </li>
+                        `
+                        )
+                        .join("")}
+                </ul>
+            `;
+        }
+
+        if (!html) {
+            html = `
+                <div class="explanation-summary">
+                    Risk score: ${Math.round(
+                        Number(
+                            currentUnifiedRisk?.score || 0
+                        )
+                    )}
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+    }
+
+    /* =========================================================
+       DECISION PATH
+       ========================================================= */
+
+    function generateDecisionPath() {
+        if (
+            !window.LockLensPrivacyDecision ||
+            typeof window.LockLensPrivacyDecision
+                .generateDecisionPath !== "function"
+        ) {
+            return null;
+        }
+
+        try {
+            return window.LockLensPrivacyDecision
+                .generateDecisionPath({
+                    findings: currentFindings,
+                    risk: currentUnifiedRisk,
+                    urlRisk: currentURLRisk,
+                    emailRisk: currentEmailRisk,
+                    privacyLabel: currentPrivacyLabel
+                });
+        } catch (error) {
+            console.warn(
+                "Privacy Decision Path generation failed:",
+                error
+            );
+
+            return null;
+        }
+    }
+
+    function renderDecisionPath(decision) {
+        const container =
+            $("decisionPathContent");
+
+        if (!container) {
+            return;
+        }
+
+        if (!decision) {
+            container.innerHTML = `
+                <div class="decision-card">
+                    <div class="decision-question">
+                        Privacy decision path is not available yet.
+                    </div>
+                </div>
+            `;
 
             return;
         }
 
-        elements.explanationPanel.style.display =
-            "block";
+        const path =
+            Array.isArray(decision.path)
+                ? decision.path
+                : [];
 
-        if (
-            elements.explanationSummary
-        ) {
-            elements.explanationSummary.textContent =
-                explanation.summary ||
-                "No explanation available.";
+        if (path.length === 0) {
+            container.innerHTML = `
+                <div class="decision-card">
+                    <div class="decision-question">
+                        No decision-path questions were generated.
+                    </div>
+                </div>
+            `;
+
+            return;
         }
 
-        if (
-            elements.explanationReasons
-        ) {
-            elements.explanationReasons.innerHTML =
-                "";
+        container.innerHTML = path
+            .map((step, index) => {
+                const number =
+                    index + 1;
 
-            const title =
-                document.createElement(
-                    "div"
-                );
+                const title =
+                    step.title ||
+                    step.name ||
+                    `Step ${number}`;
 
-            title.className =
-                "explanation-title";
+                const question =
+                    step.question ||
+                    "";
 
-            title.textContent =
-                "WHY WAS THIS RISK DETECTED?";
+                const answer =
+                    step.answer ||
+                    step.explanation ||
+                    step.description ||
+                    "";
 
-            elements.explanationReasons
-                .appendChild(title);
+                const status =
+                    step.status ||
+                    step.level ||
+                    "";
 
-            (
-                explanation.reasons ||
-                []
-            ).forEach(
-                (reason) => {
-                    const item =
-                        document.createElement(
-                            "div"
-                        );
+                const categories =
+                    Array.isArray(step.categories)
+                        ? step.categories
+                        : [];
 
-                    item.className =
-                        "explanation-item";
+                const categoryHTML =
+                    categories.length > 0
+                        ? `
+                            <div class="decision-categories">
+                                ${categories
+                                    .map(
+                                        (category) => `
+                                            <span class="category-pill">
+                                                ${escapeHTML(
+                                                    typeof category === "string"
+                                                        ? category
+                                                        : category.label ||
+                                                          category.name ||
+                                                          category.category ||
+                                                          ""
+                                                )}
+                                            </span>
+                                        `
+                                    )
+                                    .join("")}
+                            </div>
+                        `
+                        : "";
 
-                    item.textContent =
-                        reason;
+                return `
+                    <div class="decision-card">
 
-                    elements.explanationReasons
-                        .appendChild(item);
-                }
+                        <div class="decision-number">
+                            ${number}
+                        </div>
+
+                        <div class="decision-title">
+                            ${escapeHTML(title)}
+                        </div>
+
+                        ${
+                            question
+                                ? `
+                                    <div class="decision-question">
+                                        ${escapeHTML(question)}
+                                    </div>
+                                `
+                                : ""
+                        }
+
+                        ${
+                            answer
+                                ? `
+                                    <div class="decision-answer">
+                                        ${escapeHTML(answer)}
+                                    </div>
+                                `
+                                : ""
+                        }
+
+                        ${categoryHTML}
+
+                        ${
+                            status
+                                ? `
+                                    <div class="decision-status">
+                                        ${escapeHTML(status)}
+                                    </div>
+                                `
+                                : ""
+                        }
+
+                    </div>
+                `;
+            })
+            .join("");
+    }
+
+    /* =========================================================
+       URL RISK RENDERING
+       ========================================================= */
+
+    function renderURLRisk(urlRisk) {
+        const container =
+            $("urlRiskContent");
+
+        if (!container) {
+            return;
+        }
+
+        if (!urlRisk) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    URL risk analysis unavailable.
+                </div>
+            `;
+
+            return;
+        }
+
+        const score =
+            Number(urlRisk.score) || 0;
+
+        const level =
+            urlRisk.level || "Low";
+
+        const checks =
+            urlRisk.checks || {};
+
+        const signals = [];
+
+        if (checks.https === false) {
+            signals.push(
+                "The page is not using HTTPS."
+            );
+        }
+
+        if (checks.ipAddress) {
+            signals.push(
+                "The URL uses an IP address."
+            );
+        }
+
+        if (checks.manySubdomains) {
+            signals.push(
+                "The URL contains many subdomains."
+            );
+        }
+
+        if (checks.longUrl) {
+            signals.push(
+                "The URL is unusually long."
+            );
+        }
+
+        if (checks.suspiciousPort) {
+            signals.push(
+                "A non-standard port was detected."
+            );
+        }
+
+        if (checks.usernameInUrl) {
+            signals.push(
+                "Username information appears in the URL."
+            );
+        }
+
+        if (checks.urlShortener) {
+            signals.push(
+                "A URL-shortening pattern was detected."
+            );
+        }
+
+        if (checks.encodedUrl) {
+            signals.push(
+                "Encoded URL content was detected."
             );
         }
 
         if (
-            elements.explanationActions
+            Array.isArray(
+                checks.suspiciousCharacters
+            ) &&
+            checks.suspiciousCharacters.length > 0
         ) {
-            elements.explanationActions.innerHTML =
-                "";
+            signals.push(
+                "Potentially suspicious URL characters were detected."
+            );
+        }
 
-            const title =
-                document.createElement(
-                    "div"
+        container.innerHTML = `
+            <div class="risk-mini-summary">
+
+                <strong>
+                    ${Math.round(score)}
+                </strong>
+
+                <span>
+                    ${escapeHTML(level)}
+                </span>
+
+            </div>
+
+            ${
+                signals.length > 0
+                    ? `
+                        <ul class="risk-signal-list">
+                            ${signals
+                                .map(
+                                    (signal) => `
+                                    <li>
+                                        ${escapeHTML(signal)}
+                                    </li>
+                                `
+                                )
+                                .join("")}
+                        </ul>
+                    `
+                    : `
+                        <div class="empty-state">
+                            No obvious structural URL risk signals were detected.
+                        </div>
+                    `
+            }
+        `;
+    }
+
+    /* =========================================================
+       RECOMMENDATIONS
+       ========================================================= */
+
+    function generateRecommendations() {
+        if (
+            !window.LockLensRecommendations ||
+            typeof window.LockLensRecommendations
+                .generateRecommendations !== "function"
+        ) {
+            return null;
+        }
+
+        try {
+            return window.LockLensRecommendations
+                .generateRecommendations(
+                    currentFindings,
+                    currentUnifiedRisk
                 );
+        } catch (error) {
+            console.warn(
+                "Recommendation generation failed:",
+                error
+            );
 
-            title.className =
-                "explanation-title";
+            return null;
+        }
+    }
 
-            title.textContent =
-                "WHAT SHOULD I DO?";
+    /* =========================================================
+       TIMELINE
+       ========================================================= */
 
-            elements.explanationActions
-                .appendChild(title);
+    async function recordTimeline() {
+        if (
+            !window.LockLensTimeline ||
+            typeof window.LockLensTimeline
+                .securelyRecordExposure !== "function"
+        ) {
+            return;
+        }
 
-            (
-                explanation.actions ||
-                []
-            ).forEach(
-                (action) => {
-                    const item =
-                        document.createElement(
-                            "div"
-                        );
-
-                    item.className =
-                        "explanation-item";
-
-                    item.textContent =
-                        action;
-
-                    elements.explanationActions
-                        .appendChild(item);
-                }
+        try {
+            await window.LockLensTimeline
+                .securelyRecordExposure(
+                    currentFindings,
+                    currentUnifiedRisk
+                );
+        } catch (error) {
+            console.warn(
+                "Timeline recording failed:",
+                error
             );
         }
     }
 
-    // =====================================================
-    // PRIVACY GUARD
-    // =====================================================
+    /* =========================================================
+       SAVE SCAN DATA
+       ========================================================= */
 
-    async function loadPrivacyGuardState() {
-        const data =
-            await chrome.storage.local.get(
-                "privacyGuardEnabled"
+    async function saveScanData(tab) {
+        const timestamp =
+            Date.now();
+
+        await storageSet({
+            lockLensFindings:
+                currentFindings,
+
+            lockLensRisk:
+                currentPageRisk,
+
+            lockLensUnifiedRisk:
+                currentUnifiedRisk,
+
+            lockLensRecommendations:
+                currentRecommendations,
+
+            lockLensExplanation:
+                currentExplanation,
+
+            lockLensPrivacyLabel:
+                currentPrivacyLabel,
+
+            lockLensPrivacyDecision:
+                currentDecisionPath,
+
+            lockLensLastScan:
+                timestamp,
+
+            lockLensURLRisk:
+                currentURLRisk
+                    ? {
+                        valid:
+                            currentURLRisk.valid,
+                        score:
+                            currentURLRisk.score,
+                        level:
+                            currentURLRisk.level,
+                        checks:
+                            currentURLRisk.checks,
+                        recommendations:
+                            currentURLRisk.recommendations,
+                        limitations:
+                            currentURLRisk.limitations
+                    }
+                    : null
+        });
+    }
+
+    /* =========================================================
+       FULL PAGE ANALYSIS
+       ========================================================= */
+
+    async function analyzeCurrentPage() {
+        const analyzeButton =
+            $("analyzeButton");
+
+        try {
+            if (analyzeButton) {
+                analyzeButton.disabled = true;
+                analyzeButton.textContent =
+                    "Analyzing...";
+            }
+
+            setStatus(
+                true,
+                "Analyzing page locally..."
             );
 
-        updatePrivacyGuardButton(
-            data.privacyGuardEnabled !== false
+            const tab =
+                await getCurrentTab();
+
+            if (!tab) {
+                throw new Error(
+                    "Unable to access the current browser tab."
+                );
+            }
+
+            currentFindings =
+                normalizeFindings(
+                    await runScanner(tab)
+                );
+
+            currentPageRisk =
+                calculatePageRisk(
+                    currentFindings
+                );
+
+            currentURLRisk =
+                calculateURLRisk(tab);
+
+            currentUnifiedRisk =
+                calculateUnifiedRisk({
+                    findings:
+                        currentFindings,
+                    urlRisk:
+                        currentURLRisk,
+                    emailRisk:
+                        currentEmailRisk
+                });
+
+            currentRecommendations =
+                generateRecommendations();
+
+            currentExplanation =
+                generateExplanation();
+
+            currentPrivacyLabel =
+                generatePrivacyLabel();
+
+            currentDecisionPath =
+                generateDecisionPath();
+
+            renderRisk(
+                currentUnifiedRisk
+            );
+
+            renderURLRisk(
+                currentURLRisk
+            );
+
+            renderExplanation(
+                currentExplanation
+            );
+
+            renderPrivacyLabel(
+                currentPrivacyLabel
+            );
+
+            renderDecisionPath(
+                currentDecisionPath
+            );
+
+            await saveScanData(tab);
+
+            await recordTimeline();
+
+            const categoryCount =
+                new Set(
+                    currentFindings.map(
+                        (finding) =>
+                            String(
+                                finding.category ||
+                                ""
+                            ).toLowerCase()
+                    )
+                ).size;
+
+            setStatus(
+                true,
+                `Analysis complete — ${categoryCount} privacy category(s) detected.`
+            );
+
+        } catch (error) {
+            console.error(
+                "LockLens analysis error:",
+                error
+            );
+
+            setStatus(
+                false,
+                error?.message ||
+                "Analysis failed."
+            );
+
+            renderRisk({
+                score: 0,
+                level: "Low"
+            });
+
+        } finally {
+            if (analyzeButton) {
+                analyzeButton.disabled = false;
+                analyzeButton.textContent =
+                    "Analyze This Page";
+            }
+        }
+    }
+
+    /* =========================================================
+       PRIVACY GUARD
+       ========================================================= */
+
+    async function loadPrivacyGuardState() {
+        const result =
+            await storageGet([
+                "privacyGuardEnabled"
+            ]);
+
+        const enabled =
+            result.privacyGuardEnabled !== false;
+
+        updatePrivacyGuardUI(
+            enabled
         );
+
+        return enabled;
     }
 
     async function togglePrivacyGuard() {
-        try {
-            const data =
-                await chrome.storage.local.get(
-                    "privacyGuardEnabled"
-                );
+        const result =
+            await storageGet([
+                "privacyGuardEnabled"
+            ]);
 
-            const currentState =
-                data.privacyGuardEnabled !== false;
+        const enabled =
+            result.privacyGuardEnabled !== false;
 
-            const newState =
-                !currentState;
+        const newState =
+            !enabled;
 
-            await chrome.storage.local.set({
-                privacyGuardEnabled:
-                    newState
-            });
-
-            updatePrivacyGuardButton(
+        await storageSet({
+            privacyGuardEnabled:
                 newState
-            );
+        });
 
-            setStatus(
-                newState
-                    ? "Privacy Guard enabled."
-                    : "Privacy Guard disabled."
-            );
-        } catch (error) {
-            console.error(
-                "Privacy Guard toggle failed:",
-                error
-            );
-
-            setStatus(
-                "Could not change Privacy Guard."
-            );
-        }
-    }
-
-    function updatePrivacyGuardButton(
-        enabled
-    ) {
-        if (
-            !elements.privacyGuardButton
-        ) {
-            return;
-        }
-
-        elements.privacyGuardButton.textContent =
-            enabled
-                ? "Privacy Guard: ON"
-                : "Privacy Guard: OFF";
-
-        elements.privacyGuardButton.classList.toggle(
-            "active",
-            enabled
+        updatePrivacyGuardUI(
+            newState
         );
     }
 
-    // =====================================================
-    // LOAD PREVIOUS RESULTS
-    // =====================================================
+    function updatePrivacyGuardUI(enabled) {
+        const toggle =
+            $("privacyGuardToggle");
 
-    async function loadPreviousResults() {
-        try {
-            const data =
-                await chrome.storage.local.get([
-                    "lockLensRisk",
-                    "lockLensURLRisk",
-                    "lockLensExplanation"
-                ]);
+        const button =
+            $("privacyGuardButton");
 
-            if (data.lockLensURLRisk) {
-                renderStoredURLRisk(
-                    data.lockLensURLRisk
-                );
+        if (toggle) {
+            if (
+                toggle.type === "checkbox"
+            ) {
+                toggle.checked =
+                    enabled;
             }
+        }
 
-            if (data.lockLensExplanation) {
-                renderExplanation(
-                    data.lockLensExplanation
-                );
-            }
+        if (button) {
+            button.textContent =
+                enabled
+                    ? "Privacy Guard: ON"
+                    : "Privacy Guard: OFF";
 
-            if (data.lockLensRisk) {
-                setStatus(
-                    `Last privacy risk: ${data.lockLensRisk.score}/100 — ${data.lockLensRisk.level}`
-                );
-            }
-        } catch (error) {
-            console.warn(
-                "Could not load previous results:",
-                error
+            button.classList.toggle(
+                "active",
+                enabled
             );
         }
     }
 
-    function renderStoredURLRisk(
-        data
-    ) {
+    /* =========================================================
+       EMAIL HEADER ANALYZER
+       ========================================================= */
+
+    function getEmailInput() {
+        const input =
+            $("emailHeadersInput");
+
+        if (!input) {
+            return "";
+        }
+
+        return input.value.trim();
+    }
+
+    async function analyzeEmailHeaders() {
+        const input =
+            getEmailInput();
+
+        const resultContainer =
+            $("emailResult");
+
+        if (!input) {
+            if (resultContainer) {
+                resultContainer.innerHTML = `
+                    <div class="empty-state">
+                        Paste dummy/test email headers first.
+                    </div>
+                `;
+            }
+
+            return;
+        }
+
         if (
-            !elements.urlPanel ||
-            !data
+            !window.LockLensEmailAnalyzer ||
+            typeof window.LockLensEmailAnalyzer
+                .analyzeHeaders !== "function"
+        ) {
+            if (resultContainer) {
+                resultContainer.innerHTML = `
+                    <div class="empty-state">
+                        Email Header Analyzer is unavailable.
+                    </div>
+                `;
+            }
+
+            return;
+        }
+
+        try {
+            if (resultContainer) {
+                resultContainer.innerHTML = `
+                    <div class="empty-state">
+                        Analyzing headers locally...
+                    </div>
+                `;
+            }
+
+            const result =
+                window.LockLensEmailAnalyzer
+                    .analyzeHeaders(input);
+
+            currentEmailRisk =
+                result;
+
+            /*
+             * Important:
+             * Only anonymous email metadata is stored.
+             * Raw email headers are never saved.
+             */
+
+            await storageSet({
+                lockLensEmailRisk:
+                    {
+                        score:
+                            result.score,
+                        level:
+                            result.level,
+                        spf:
+                            result.spf,
+                        dkim:
+                            result.dkim,
+                        dmarc:
+                            result.dmarc,
+                        fromReturnPathMismatch:
+                            result.fromReturnPathMismatch,
+                        replyToMismatch:
+                            result.replyToMismatch,
+                        messageIdDomainMismatch:
+                            result.messageIdDomainMismatch,
+                        receivedCount:
+                            result.receivedCount,
+                        recommendations:
+                            result.recommendations,
+                        limitations:
+                            result.limitations,
+                        processedLocally:
+                            true,
+                        rawHeadersStored:
+                            false,
+                        timestamp:
+                            Date.now()
+                    }
+            });
+
+            currentUnifiedRisk =
+                calculateUnifiedRisk({
+                    findings:
+                        currentFindings,
+                    urlRisk:
+                        currentURLRisk,
+                    emailRisk:
+                        currentEmailRisk
+                });
+
+            currentRecommendations =
+                generateRecommendations();
+
+            currentExplanation =
+                generateExplanation();
+
+            currentPrivacyLabel =
+                generatePrivacyLabel();
+
+            currentDecisionPath =
+                generateDecisionPath();
+
+            renderRisk(
+                currentUnifiedRisk
+            );
+
+            renderExplanation(
+                currentExplanation
+            );
+
+            renderPrivacyLabel(
+                currentPrivacyLabel
+            );
+
+            renderDecisionPath(
+                currentDecisionPath
+            );
+
+            await storageSet({
+                lockLensUnifiedRisk:
+                    currentUnifiedRisk,
+
+                lockLensRecommendations:
+                    currentRecommendations,
+
+                lockLensExplanation:
+                    currentExplanation,
+
+                lockLensPrivacyLabel:
+                    currentPrivacyLabel,
+
+                lockLensPrivacyDecision:
+                    currentDecisionPath
+            });
+
+            renderEmailResult(
+                result
+            );
+
+        } catch (error) {
+            console.error(
+                "Email header analysis failed:",
+                error
+            );
+
+            if (resultContainer) {
+                resultContainer.innerHTML = `
+                    <div class="empty-state">
+                        ${escapeHTML(
+                            error?.message ||
+                            "Unable to analyze email headers."
+                        )}
+                    </div>
+                `;
+            }
+        }
+    }
+
+    function renderEmailResult(result) {
+        const container =
+            $("emailResult");
+
+        if (!container) {
+            return;
+        }
+
+        if (!result) {
+            container.innerHTML = "";
+            return;
+        }
+
+        const score =
+            Number(result.score) || 0;
+
+        const level =
+            result.level || "Low";
+
+        const checks = [];
+
+        if (result.spf) {
+            checks.push(
+                `SPF: ${result.spf.status || "unknown"}`
+            );
+        }
+
+        if (result.dkim) {
+            checks.push(
+                `DKIM: ${result.dkim.status || "unknown"}`
+            );
+        }
+
+        if (result.dmarc) {
+            checks.push(
+                `DMARC: ${result.dmarc.status || "unknown"}`
+            );
+        }
+
+        if (
+            result.fromReturnPathMismatch
+        ) {
+            checks.push(
+                "From / Return-Path mismatch detected"
+            );
+        }
+
+        if (
+            result.replyToMismatch
+        ) {
+            checks.push(
+                "Reply-To mismatch detected"
+            );
+        }
+
+        if (
+            result.messageIdDomainMismatch
+        ) {
+            checks.push(
+                "Message-ID domain mismatch detected"
+            );
+        }
+
+        if (
+            typeof result.receivedCount === "number"
+        ) {
+            checks.push(
+                `Received headers: ${result.receivedCount}`
+            );
+        }
+
+        container.innerHTML = `
+            <div class="email-risk-summary">
+
+                <strong>
+                    ${Math.round(score)}
+                </strong>
+
+                <span>
+                    ${escapeHTML(level)}
+                </span>
+
+            </div>
+
+            ${
+                checks.length > 0
+                    ? `
+                        <ul class="email-check-list">
+                            ${checks
+                                .map(
+                                    (check) => `
+                                    <li>
+                                        ${escapeHTML(check)}
+                                    </li>
+                                `
+                                )
+                                .join("")}
+                        </ul>
+                    `
+                    : `
+                        <div class="empty-state">
+                            No major email authentication signals were detected.
+                        </div>
+                    `
+            }
+        `;
+    }
+
+    async function clearEmailHeaders() {
+        const input =
+            $("emailHeadersInput");
+
+        const result =
+            $("emailResult");
+
+        if (input) {
+            input.value = "";
+        }
+
+        if (result) {
+            result.innerHTML = "";
+        }
+
+        currentEmailRisk =
+            null;
+
+        await storageRemove([
+            "lockLensEmailRisk"
+        ]);
+
+        currentUnifiedRisk =
+            calculateUnifiedRisk({
+                findings:
+                    currentFindings,
+                urlRisk:
+                    currentURLRisk,
+                emailRisk:
+                    null
+            });
+
+        currentRecommendations =
+            generateRecommendations();
+
+        currentExplanation =
+            generateExplanation();
+
+        currentPrivacyLabel =
+            generatePrivacyLabel();
+
+        currentDecisionPath =
+            generateDecisionPath();
+
+        renderRisk(
+            currentUnifiedRisk
+        );
+
+        renderExplanation(
+            currentExplanation
+        );
+
+        renderPrivacyLabel(
+            currentPrivacyLabel
+        );
+
+        renderDecisionPath(
+            currentDecisionPath
+        );
+
+        await storageSet({
+            lockLensUnifiedRisk:
+                currentUnifiedRisk,
+
+            lockLensRecommendations:
+                currentRecommendations,
+
+            lockLensExplanation:
+                currentExplanation,
+
+            lockLensPrivacyLabel:
+                currentPrivacyLabel,
+
+            lockLensPrivacyDecision:
+                currentDecisionPath
+        });
+    }
+
+    /* =========================================================
+       DASHBOARD
+       ========================================================= */
+
+    function openDashboard() {
+        if (
+            typeof chrome === "undefined" ||
+            !chrome.tabs
         ) {
             return;
         }
 
-        elements.urlPanel.style.display =
-            "block";
-
-        if (elements.urlScore) {
-            elements.urlScore.textContent =
-                `${data.score ?? 0}/100`;
-        }
-
-        if (elements.urlLevel) {
-            elements.urlLevel.textContent =
-                data.level ||
-                "Unknown";
-
-            elements.urlLevel.className =
-                `url-risk-level ${String(
-                    data.level ||
-                        "unknown"
-                ).toLowerCase()}`;
-        }
-
-        if (elements.urlChecks) {
-            elements.urlChecks.innerHTML =
-                "";
-
-            const checks =
-                data.checks || {};
-
-            addURLCheck(
-                checks.https,
-                "HTTPS",
-                "Secure connection",
-                "HTTPS not detected"
-            );
-
-            addURLCheck(
-                !checks.ipAddress,
-                "IP Address",
-                "Domain name used",
-                "IP address used"
-            );
-
-            addURLCheck(
-                !checks.longUrl,
-                "URL Length",
-                "Normal length",
-                "Unusually long URL"
-            );
-
-            addURLCheck(
-                !checks.manySubdomains,
-                "Subdomains",
-                "Normal structure",
-                "Many subdomains"
-            );
-
-            addURLCheck(
-                !(
-                    typeof
-                        checks.suspiciousCharacters ===
-                        "number" &&
-                    checks.suspiciousCharacters > 0
-                ),
-                "Characters",
-                "No suspicious characters",
-                "Suspicious characters detected"
-            );
-
-            addURLCheck(
-                !checks.suspiciousPort,
-                "Port",
-                "No unusual port",
-                "Unusual port detected"
-            );
-
-            addURLCheck(
-                !checks.usernameInUrl,
-                "Username",
-                "No username in URL",
-                "Username embedded in URL"
-            );
-
-            addURLCheck(
-                !checks.urlShortener,
-                "URL Shortener",
-                "No common shortener",
-                "Shortened URL detected"
-            );
-
-            addURLCheck(
-                !checks.encodedUrl,
-                "Encoding",
-                "No unusual encoding",
-                "Encoded URL content detected"
-            );
-        }
-    }
-
-    // =====================================================
-    // DASHBOARD
-    // =====================================================
-
-    function openDashboard() {
         chrome.tabs.create({
             url:
                 chrome.runtime.getURL(
@@ -1109,118 +1723,271 @@
         });
     }
 
-    // =====================================================
-    // FALLBACK RISK ENGINE
-    // =====================================================
+    /* =========================================================
+       LOAD STORED DATA
+       ========================================================= */
 
-    function calculateFallbackRisk(
-        findings
-    ) {
-        const weights = {
-            name: 5,
-            email: 10,
-            phone: 15,
-            address: 20,
-            date: 10,
-            password: 10,
-            payment: 20,
-            government_id: 25,
-            location: 15,
-            username: 5
-        };
+    async function loadStoredData() {
+        const stored =
+            await storageGet([
+                "lockLensFindings",
+                "lockLensRisk",
+                "lockLensUnifiedRisk",
+                "lockLensRecommendations",
+                "lockLensExplanation",
+                "lockLensPrivacyLabel",
+                "lockLensPrivacyDecision",
+                "lockLensURLRisk",
+                "lockLensEmailRisk",
+                "lockLensLastScan"
+            ]);
 
-        let score = 0;
+        currentFindings =
+            Array.isArray(
+                stored.lockLensFindings
+            )
+                ? stored.lockLensFindings
+                : [];
 
-        const categories =
-            new Set();
+        currentPageRisk =
+            stored.lockLensRisk ||
+            null;
 
-        findings.forEach(
-            (finding) => {
-                const category =
-                    String(
-                        finding.category ||
-                            ""
-                    ).toLowerCase();
+        currentUnifiedRisk =
+            stored.lockLensUnifiedRisk ||
+            currentPageRisk ||
+            null;
 
-                if (
-                    weights[category] !==
-                    undefined
-                ) {
-                    score +=
-                        weights[category];
+        currentRecommendations =
+            stored.lockLensRecommendations ||
+            null;
 
-                    categories.add(
-                        category
+        currentExplanation =
+            stored.lockLensExplanation ||
+            null;
+
+        currentPrivacyLabel =
+            stored.lockLensPrivacyLabel ||
+            null;
+
+        currentDecisionPath =
+            stored.lockLensPrivacyDecision ||
+            null;
+
+        currentURLRisk =
+            stored.lockLensURLRisk ||
+            null;
+
+        currentEmailRisk =
+            stored.lockLensEmailRisk ||
+            null;
+
+        renderRisk(
+            currentUnifiedRisk
+        );
+
+        renderURLRisk(
+            currentURLRisk
+        );
+
+        renderExplanation(
+            currentExplanation
+        );
+
+        renderPrivacyLabel(
+            currentPrivacyLabel
+        );
+
+        renderDecisionPath(
+            currentDecisionPath
+        );
+
+        if (currentEmailRisk) {
+            renderEmailResult(
+                currentEmailRisk
+            );
+        }
+
+        return stored;
+    }
+
+    /* =========================================================
+       EVENT LISTENERS
+       ========================================================= */
+
+    function attachEventListeners() {
+        const analyzeButton =
+            $("analyzeButton");
+
+        if (analyzeButton) {
+            analyzeButton.addEventListener(
+                "click",
+                analyzeCurrentPage
+            );
+        }
+
+        const guardButton =
+            $("privacyGuardButton");
+
+        if (guardButton) {
+            guardButton.addEventListener(
+                "click",
+                togglePrivacyGuard
+            );
+        }
+
+        const guardToggle =
+            $("privacyGuardToggle");
+
+        if (guardToggle) {
+            guardToggle.addEventListener(
+                "change",
+                async () => {
+                    await storageSet({
+                        privacyGuardEnabled:
+                            guardToggle.checked
+                    });
+
+                    updatePrivacyGuardUI(
+                        guardToggle.checked
+                    );
+                }
+            );
+        }
+
+        const emailButton =
+            $("analyzeEmailButton");
+
+        if (emailButton) {
+            emailButton.addEventListener(
+                "click",
+                analyzeEmailHeaders
+            );
+        }
+
+        const clearEmailButton =
+            $("clearEmailButton");
+
+        if (clearEmailButton) {
+            clearEmailButton.addEventListener(
+                "click",
+                clearEmailHeaders
+            );
+        }
+
+        const dashboardButton =
+            $("dashboardButton");
+
+        if (dashboardButton) {
+            dashboardButton.addEventListener(
+                "click",
+                openDashboard
+            );
+        }
+
+        const openDashboardButton =
+            $("openDashboardButton");
+
+        if (openDashboardButton) {
+            openDashboardButton.addEventListener(
+                "click",
+                openDashboard
+            );
+        }
+    }
+
+    /* =========================================================
+       INITIALIZATION
+       ========================================================= */
+
+    async function initializePopup() {
+        try {
+            setStatus(
+                true,
+                "LockLens ready — analysis runs locally."
+            );
+
+            attachEventListeners();
+
+            await loadPrivacyGuardState();
+
+            await loadStoredData();
+
+            /*
+             * Automatically refresh URL risk using the
+             * current tab without storing the raw URL.
+             */
+
+            const tab =
+                await getCurrentTab();
+
+            if (
+                tab &&
+                tab.url &&
+                window.LockLensURLInspector
+            ) {
+                try {
+                    currentURLRisk =
+                        calculateURLRisk(tab);
+
+                    if (currentURLRisk) {
+                        await storageSet({
+                            lockLensURLRisk:
+                                {
+                                    valid:
+                                        currentURLRisk.valid,
+                                    score:
+                                        currentURLRisk.score,
+                                    level:
+                                        currentURLRisk.level,
+                                    checks:
+                                        currentURLRisk.checks,
+                                    recommendations:
+                                        currentURLRisk.recommendations,
+                                    limitations:
+                                        currentURLRisk.limitations
+                                }
+                        });
+
+                        renderURLRisk(
+                            currentURLRisk
+                        );
+                    }
+                } catch (error) {
+                    console.warn(
+                        "Initial URL analysis failed:",
+                        error
                     );
                 }
             }
+
+        } catch (error) {
+            console.error(
+                "LockLens popup initialization failed:",
+                error
+            );
+
+            setStatus(
+                false,
+                "LockLens initialization failed."
+            );
+        }
+    }
+
+    /* =========================================================
+       START
+       ========================================================= */
+
+    if (
+        document.readyState ===
+        "loading"
+    ) {
+        document.addEventListener(
+            "DOMContentLoaded",
+            initializePopup
         );
-
-        if (
-            categories.size >= 2 &&
-            categories.size <= 3
-        ) {
-            score += 5;
-        } else if (
-            categories.size >= 4
-        ) {
-            score += 10;
-        }
-
-        score =
-            Math.min(
-                score,
-                100
-            );
-
-        let level = "Low";
-
-        if (score >= 76) {
-            level = "Critical";
-        } else if (score >= 51) {
-            level = "High";
-        } else if (score >= 21) {
-            level = "Medium";
-        }
-
-        return {
-            version: "fallback",
-            score,
-            level,
-            categories:
-                Array.from(categories),
-            findingCount:
-                findings.length
-        };
+    } else {
+        initializePopup();
     }
 
-    // =====================================================
-    // HELPERS
-    // =====================================================
-
-    function setStatus(message) {
-        if (elements.status) {
-            elements.status.textContent =
-                message;
-        }
-    }
-
-    function setScannerStatus(message) {
-        if (elements.scannerStatus) {
-            elements.scannerStatus.textContent =
-                message;
-        }
-    }
-
-    function escapeHTML(value) {
-        const div =
-            document.createElement(
-                "div"
-            );
-
-        div.textContent =
-            String(value ?? "");
-
-        return div.innerHTML;
-    }
 })();

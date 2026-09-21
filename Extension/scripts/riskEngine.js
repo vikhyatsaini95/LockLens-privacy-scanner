@@ -1,272 +1,293 @@
-// ============================================================
-// LockLens - Explainable Risk Engine
-// ============================================================
-
-const LOCKLENS_RISK_VERSION = "2.0.0";
-
-
-const CATEGORY_WEIGHTS = {
-
-    name: 5,
-
-    email: 10,
-
-    phone: 15,
-
-    address: 20,
-
-    date: 10,
-
-    password: 10,
-
-    payment: 20,
-
-    government_id: 25,
-
-    location: 15,
-
-    username: 5
-
-};
-
-
-const CATEGORY_RECOMMENDATIONS = {
-
-    name:
-        "Share your name only when it is necessary for the service.",
-
-    email:
-        "Check whether this service really needs your email address.",
-
-    phone:
-        "Avoid sharing your phone number unless it is required.",
-
-    address:
-        "Confirm why the service needs your address before providing it.",
-
-    date:
-        "Avoid sharing personal dates unless they are necessary.",
-
-    password:
-        "Make sure you are on the intended service before entering credentials.",
-
-    payment:
-        "Check that payment information is necessary and that you trust the service.",
-
-    government_id:
-        "Government identity information is highly sensitive. Verify the purpose before providing it.",
-
-    location:
-        "Review why the service needs your location and whether access is necessary.",
-
-    username:
-        "Consider whether this username can reveal information about your online identity."
-
-};
-
-
-/**
- * Calculate LockLens risk.
- */
-function calculateRisk(findings = []) {
-
-    if (!Array.isArray(findings)) {
-        findings = [];
-    }
-
-    const uniqueFindings =
-        deduplicateRiskFindings(findings);
-
-
-    let score = 0;
-
-    const categories = [];
-
-
-    uniqueFindings.forEach((finding) => {
-
-        const weight =
-            CATEGORY_WEIGHTS[finding.category] || 0;
-
-        score += weight;
-
-        categories.push(finding.category);
-
-    });
-
-
-    const uniqueCategories =
-        [...new Set(categories)];
-
-
-    // --------------------------------------------------------
-    // Context bonus
-    // --------------------------------------------------------
-
-    if (uniqueCategories.length >= 4) {
-
-        score += 10;
-
-    } else if (uniqueCategories.length >= 2) {
-
-        score += 5;
-
-    }
-
-
-    score =
-        Math.min(score, 100);
-
-
-    const level =
-        getRiskLevel(score);
-
-
-    const recommendations =
-        generateRecommendations(uniqueCategories);
-
-
-    return {
-
-        version: LOCKLENS_RISK_VERSION,
-
-        score,
-
-        level,
-
-        categories: uniqueCategories,
-
-        findingCount: uniqueFindings.length,
-
-        recommendations,
-
-        explanation:
-            generateExplanation(
-                score,
-                level,
-                uniqueCategories
-            )
-
+(function () {
+    "use strict";
+
+    const VERSION = "2.0.0-prototype";
+
+    const CATEGORY_WEIGHTS = {
+        name: 5,
+        email: 10,
+        phone: 15,
+        address: 20,
+        date: 10,
+        password: 10,
+        payment: 20,
+        government_id: 25,
+        location: 15,
+        username: 5
     };
 
-}
+    const SOURCE_WEIGHTS = {
+        page: 0.50,
+        url: 0.25,
+        email: 0.25
+    };
 
-
-/**
- * Prevent duplicate category scoring.
- */
-function deduplicateRiskFindings(findings) {
-
-    const map = new Map();
-
-    if (!Array.isArray(findings)) {
-        return [];
-    }
-
-    findings.forEach((finding) => {
-
-        if (!finding?.category) {
-            return;
+    function getRiskLevel(score) {
+        if (score <= 20) {
+            return "Low";
         }
 
-        if (!map.has(finding.category)) {
+        if (score <= 50) {
+            return "Medium";
+        }
 
-            map.set(
-                finding.category,
-                finding
+        if (score <= 75) {
+            return "High";
+        }
+
+        return "Critical";
+    }
+
+    function normalizeCategory(category) {
+        return String(category || "")
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, "_");
+    }
+
+    function calculatePageRisk(findings) {
+        const categories = new Set();
+
+        let score = 0;
+
+        for (const finding of findings || []) {
+            const category =
+                normalizeCategory(
+                    finding?.category
+                );
+
+            if (!category) {
+                continue;
+            }
+
+            categories.add(category);
+
+            if (
+                Object.prototype.hasOwnProperty.call(
+                    CATEGORY_WEIGHTS,
+                    category
+                )
+            ) {
+                score += CATEGORY_WEIGHTS[category];
+            }
+        }
+
+        if (
+            categories.size >= 2 &&
+            categories.size <= 3
+        ) {
+            score += 5;
+        }
+
+        if (categories.size >= 4) {
+            score += 10;
+        }
+
+        score = Math.min(score, 100);
+
+        return {
+            score,
+            level: getRiskLevel(score),
+            categories: Array.from(categories),
+            findingCount: (findings || []).length
+        };
+    }
+
+    function normalizeExternalRisk(result) {
+        if (!result) {
+            return {
+                score: 0,
+                level: "Low",
+                available: false
+            };
+        }
+
+        const score = Math.max(
+            0,
+            Math.min(
+                100,
+                Number(result.score || 0)
+            )
+        );
+
+        return {
+            score,
+            level:
+                result.level ||
+                getRiskLevel(score),
+            available: true
+        };
+    }
+
+    function calculateUnifiedRisk({
+        findings = [],
+        urlRisk = null,
+        emailRisk = null
+    } = {}) {
+
+        const pageRisk =
+            calculatePageRisk(findings);
+
+        const normalizedURL =
+            normalizeExternalRisk(urlRisk);
+
+        const normalizedEmail =
+            normalizeExternalRisk(emailRisk);
+
+        /*
+         * Only include available sources
+         * in the weighted calculation.
+         */
+
+        const sources = [];
+
+        sources.push({
+            name: "Page Privacy",
+            key: "page",
+            score: pageRisk.score,
+            weight: SOURCE_WEIGHTS.page
+        });
+
+        if (normalizedURL.available) {
+            sources.push({
+                name: "URL Risk",
+                key: "url",
+                score: normalizedURL.score,
+                weight: SOURCE_WEIGHTS.url
+            });
+        }
+
+        if (normalizedEmail.available) {
+            sources.push({
+                name: "Email Risk",
+                key: "email",
+                score: normalizedEmail.score,
+                weight: SOURCE_WEIGHTS.email
+            });
+        }
+
+        /*
+         * Re-normalize weights when a source is unavailable.
+         */
+
+        const totalWeight =
+            sources.reduce(
+                (sum, source) =>
+                    sum + source.weight,
+                0
             );
 
+        let weightedScore = 0;
+
+        for (const source of sources) {
+            const normalizedWeight =
+                source.weight /
+                totalWeight;
+
+            weightedScore +=
+                source.score *
+                normalizedWeight;
         }
 
-    });
+        /*
+         * Additional cross-source context.
+         *
+         * If multiple independent sources
+         * indicate elevated risk, add a
+         * small correlation bonus.
+         */
 
-    return Array.from(map.values());
-}
+        let correlationBonus = 0;
 
+        const elevatedSources =
+            sources.filter(
+                source =>
+                    source.score >= 51
+            ).length;
 
-/**
- * Risk classification.
- */
-function getRiskLevel(score) {
+        if (elevatedSources >= 2) {
+            correlationBonus = 10;
+        }
 
-    if (score <= 20) {
-        return "Low";
+        let overallScore =
+            Math.round(
+                weightedScore +
+                correlationBonus
+            );
+
+        overallScore =
+            Math.min(
+                overallScore,
+                100
+            );
+
+        const level =
+            getRiskLevel(
+                overallScore
+            );
+
+        return {
+            version: VERSION,
+
+            score: overallScore,
+
+            level,
+
+            sources: {
+                page: {
+                    score:
+                        pageRisk.score,
+                    level:
+                        pageRisk.level,
+                    available: true
+                },
+
+                url: {
+                    score:
+                        normalizedURL.score,
+                    level:
+                        normalizedURL.level,
+                    available:
+                        normalizedURL.available
+                },
+
+                email: {
+                    score:
+                        normalizedEmail.score,
+                    level:
+                        normalizedEmail.level,
+                    available:
+                        normalizedEmail.available
+                }
+            },
+
+            categories:
+                pageRisk.categories,
+
+            findingCount:
+                pageRisk.findingCount,
+
+            correlationBonus,
+
+            generatedLocally: true,
+
+            timestamp: Date.now()
+        };
     }
 
-    if (score <= 50) {
-        return "Medium";
+    function calculateRisk(findings) {
+        return calculatePageRisk(findings);
     }
-
-    if (score <= 75) {
-        return "High";
-    }
-
-    return "Critical";
-
-}
-
-
-/**
- * Generate recommendations.
- */
-function generateRecommendations(categories) {
-
-    return categories
-        .map(
-            category =>
-                CATEGORY_RECOMMENDATIONS[category]
-        )
-        .filter(Boolean);
-
-}
-
-
-/**
- * Explain why the score exists.
- */
-function generateExplanation(
-    score,
-    level,
-    categories
-) {
-
-    if (categories.length === 0) {
-
-        return "No supported privacy exposure signals were detected.";
-
-    }
-
-
-    return (
-        `LockLens detected ${categories.length} `
-        + `privacy-related categor${
-            categories.length === 1 ? "y" : "ies"
-        }. `
-        + `The calculated exposure level is ${level} `
-        + `with a score of ${score}/100.`
-    );
-
-}
-
-
-/**
- * Export.
- */
-if (typeof window !== "undefined") {
 
     window.LockLensRiskEngine = {
-
-        version: LOCKLENS_RISK_VERSION,
-
-        categoryWeights:
-            CATEGORY_WEIGHTS,
+        version: VERSION,
 
         calculateRisk,
 
-        getRiskLevel,
+        calculatePageRisk,
 
-        generateRecommendations
+        calculateUnifiedRisk,
 
+        getRiskLevel
     };
-
-}
+})();

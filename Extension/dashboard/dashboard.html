@@ -2,7 +2,6 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
 
     <meta
@@ -10,452 +9,1288 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>LockLens Dashboard</title>
+    <title>LockLens — Privacy Dashboard</title>
 
     <link
         rel="stylesheet"
         href="dashboard.css"
     >
-
 </head>
 
 <body>
 
-<div class="dashboard-container">
+    <!-- =====================================================
+         SIDEBAR
+         ===================================================== -->
 
-    <!-- ==========================================
-         HEADER
-    =========================================== -->
+    <aside class="sidebar">
 
-    <header class="dashboard-header">
+        <div class="brand">
 
-        <div>
-
-            <div class="brand">
-                Lock<span>Lens</span>
+            <div class="brand-icon">
+                🔐
             </div>
 
-            <p class="subtitle">
-                Privacy Exposure Dashboard
-            </p>
+            <div class="brand-text">
+                <h1>LockLens</h1>
+
+                <span>
+                    Privacy Intelligence
+                </span>
+            </div>
 
         </div>
 
-        <div class="privacy-status">
-            🔐 Local Privacy Mode
+
+        <nav class="sidebar-nav">
+
+            <button
+                class="nav-item active"
+                data-section="overview"
+            >
+                <span class="nav-icon">◉</span>
+                <span>Overview</span>
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-section="riskSources"
+            >
+                <span class="nav-icon">⚠</span>
+                <span>Risk Sources</span>
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-section="nutrition"
+            >
+                <span class="nav-icon">◈</span>
+                <span>Privacy Nutrition</span>
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-section="categoryIntelligenceSection"
+            >
+                <span class="nav-icon">◎</span>
+                <span>Category Intelligence</span>
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-section="decisionPath"
+            >
+                <span class="nav-icon">◆</span>
+                <span>Decision Path</span>
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-section="explanationSection"
+            >
+                <span class="nav-icon">?</span>
+                <span>Why This Risk?</span>
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-section="categoriesSection"
+            >
+                <span class="nav-icon">◫</span>
+                <span>Exposure Categories</span>
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-section="urlSection"
+            >
+                <span class="nav-icon">↗</span>
+                <span>URL Assessment</span>
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-section="emailSection"
+            >
+                <span class="nav-icon">✉</span>
+                <span>Email Assessment</span>
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-section="recommendationsSection"
+            >
+                <span class="nav-icon">✓</span>
+                <span>Recommendations</span>
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-section="timelineSection"
+            >
+                <span class="nav-icon">◷</span>
+                <span>Digital Timeline</span>
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-section="guardSection"
+            >
+                <span class="nav-icon">🛡</span>
+                <span>Privacy Guard</span>
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-section="architectureSection"
+            >
+                <span class="nav-icon">⌘</span>
+                <span>Privacy Architecture</span>
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-section="localDataSection"
+            >
+                <span class="nav-icon">▣</span>
+                <span>Local Data</span>
+            </button>
+
+        </nav>
+
+
+        <div class="sidebar-footer">
+
+            <div class="local-badge">
+
+                <span class="status-dot active"></span>
+
+                Local Processing
+
+            </div>
+
+            <small>
+                LockLens Prototype
+            </small>
+
         </div>
 
-    </header>
+    </aside>
 
 
-    <!-- ==========================================
-         CURRENT PRIVACY RISK
-    =========================================== -->
 
-    <section class="dashboard-card risk-overview">
+    <!-- =====================================================
+         MAIN CONTENT
+         ===================================================== -->
 
-        <div class="section-heading">
+    <main class="main-content">
 
-            <div>
 
-                <p class="eyebrow">
-                    CURRENT ASSESSMENT
-                </p>
+        <!-- =================================================
+             TOP BAR
+             ================================================= -->
+
+        <header class="topbar">
+
+            <div class="topbar-content">
+
+                <span class="eyebrow">
+                    PRIVACY INTELLIGENCE DASHBOARD
+                </span>
 
                 <h2>
-                    Privacy Exposure Risk
+                    Your Digital Privacy Overview
                 </h2>
 
-            </div>
-
-            <div id="lastScanTime">
-                No scan yet
-            </div>
-
-        </div>
-
-        <div class="risk-main">
-
-            <div class="risk-score-box">
-
-                <span class="risk-label">
-                    Risk Score
-                </span>
-
-                <strong id="riskScore">
-                    —
-                </strong>
-
-                <span id="riskLevel">
-                    Not analyzed
-                </span>
-
-            </div>
-
-            <div class="risk-summary">
-
                 <p>
-                    LockLens evaluates exposure
-                    signals without storing the
-                    actual personal information
-                    detected on the page.
+                    Understand what privacy signals LockLens
+                    detected and why they matter.
                 </p>
 
-                <div id="riskCategories">
-                    No categories detected.
+            </div>
+
+
+            <div class="topbar-actions">
+
+                <button
+                    id="refreshDashboard"
+                    class="secondary-button"
+                >
+                    ↻ Refresh
+                </button>
+
+            </div>
+
+        </header>
+
+
+
+        <!-- =================================================
+             OVERVIEW
+             ================================================= -->
+
+        <section
+            id="overview"
+            class="dashboard-section"
+        >
+
+            <div class="section-header">
+
+                <div>
+
+                    <span class="section-label">
+                        OVERVIEW
+                    </span>
+
+                    <h2>
+                        Current Privacy Risk
+                    </h2>
+
+                    <p>
+                        Combined analysis of available
+                        privacy signals.
+                    </p>
+
                 </div>
 
             </div>
 
-        </div>
 
-    </section>
+            <div class="overview-grid">
 
 
-    <!-- ==========================================
-         URL SECURITY
-    =========================================== -->
+                <div class="dashboard-card risk-card">
 
-    <section class="dashboard-card url-inspector-dashboard">
+                    <span class="card-label">
+                        CURRENT PRIVACY RISK
+                    </span>
 
-        <div class="section-heading">
+                    <div class="risk-score-row">
 
-            <div>
+                        <strong
+                            id="riskScore"
+                            class="risk-value"
+                        >
+                            0
+                        </strong>
 
-                <p class="eyebrow">
-                    URL SECURITY
+                        <span
+                            id="riskLevel"
+                            class="risk-level low"
+                        >
+                            Low
+                        </span>
+
+                    </div>
+
+                    <p id="riskSummary">
+                        No analysis available yet.
+                    </p>
+
+                </div>
+
+
+                <div class="dashboard-card">
+
+                    <span class="card-label">
+                        DETECTED SIGNALS
+                    </span>
+
+                    <strong
+                        id="findingCount"
+                        class="large-number"
+                    >
+                        0
+                    </strong>
+
+                    <p>
+                        Privacy-sensitive findings
+                    </p>
+
+                </div>
+
+
+                <div class="dashboard-card">
+
+                    <span class="card-label">
+                        LAST ANALYSIS
+                    </span>
+
+                    <strong
+                        id="lastScan"
+                        class="small-value"
+                    >
+                        Not available
+                    </strong>
+
+                    <p>
+                        Most recent local analysis
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             RISK SOURCES
+             ================================================= -->
+
+        <section
+            id="riskSources"
+            class="dashboard-section"
+        >
+
+            <div class="section-header">
+
+                <div>
+
+                    <span class="section-label">
+                        RISK ENGINE
+                    </span>
+
+                    <h2>
+                        Risk Sources
+                    </h2>
+
+                    <p>
+                        LockLens combines available signals
+                        from multiple analysis layers.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="source-grid">
+
+
+                <div class="dashboard-card source-card">
+
+                    <span class="card-label">
+                        PAGE PRIVACY
+                    </span>
+
+                    <div
+                        id="pageRisk"
+                        class="source-value"
+                    >
+                        Not available
+                    </div>
+
+                    <p>
+                        Detected privacy-sensitive
+                        page/form categories.
+                    </p>
+
+                </div>
+
+
+                <div class="dashboard-card source-card">
+
+                    <span class="card-label">
+                        URL RISK
+                    </span>
+
+                    <div
+                        id="urlRisk"
+                        class="source-value"
+                    >
+                        Not available
+                    </div>
+
+                    <p>
+                        Structural URL risk signals.
+                    </p>
+
+                </div>
+
+
+                <div class="dashboard-card source-card">
+
+                    <span class="card-label">
+                        EMAIL RISK
+                    </span>
+
+                    <div
+                        id="emailRisk"
+                        class="source-value"
+                    >
+                        Not available
+                    </div>
+
+                    <p>
+                        Authentication and header signals.
+                    </p>
+
+                </div>
+
+
+                <div class="dashboard-card source-card">
+
+                    <span class="card-label">
+                        CORRELATION BONUS
+                    </span>
+
+                    <div
+                        id="correlationBonus"
+                        class="source-value"
+                    >
+                        0
+                    </div>
+
+                    <p>
+                        Additional correlation signal
+                        when multiple sources are elevated.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             PRIVACY NUTRITION LABEL
+             ================================================= -->
+
+        <section
+            id="nutrition"
+            class="dashboard-section"
+        >
+
+            <div class="section-header">
+
+                <div>
+
+                    <span class="section-label">
+                        PRIVACY NUTRITION LABEL
+                    </span>
+
+                    <h2>
+                        What Information Is Being Requested?
+                    </h2>
+
+                    <p>
+                        A simple summary of detected privacy
+                        categories and sensitivity.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="nutrition-layout">
+
+
+                <div class="dashboard-card nutrition-score-card">
+
+                    <span class="card-label">
+                        PRIVACY SCORE
+                    </span>
+
+                    <strong
+                        id="nutritionScore"
+                        class="large-number"
+                    >
+                        0
+                    </strong>
+
+                    <p>
+                        Combined privacy risk score
+                    </p>
+
+                </div>
+
+
+                <div
+                    id="nutritionLabel"
+                    class="dashboard-card nutrition-summary-card"
+                >
+
+                    <span class="card-label">
+                        EXPOSURE SUMMARY
+                    </span>
+
+                    <p id="nutritionExposure">
+                        No analysis available yet.
+                    </p>
+
+                    <p id="nutritionSummary">
+                        Analyze a page to generate
+                        the privacy nutrition label.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="nutrition-detail-grid">
+
+
+                <div class="dashboard-card">
+
+                    <h3>
+                        Sensitivity
+                    </h3>
+
+                    <div
+                        id="nutritionSensitivity"
+                        class="nutrition-content"
+                    >
+                        <div class="empty-state">
+                            No sensitivity analysis yet.
+                        </div>
+                    </div>
+
+                </div>
+
+
+                <div class="dashboard-card">
+
+                    <h3>
+                        Security Signals
+                    </h3>
+
+                    <div
+                        id="nutritionSignals"
+                        class="nutrition-content"
+                    >
+                        <div class="empty-state">
+                            No security signals yet.
+                        </div>
+                    </div>
+
+                </div>
+
+
+                <div class="dashboard-card">
+
+                    <h3>
+                        Suggested Actions
+                    </h3>
+
+                    <div
+                        id="nutritionActions"
+                        class="nutrition-content"
+                    >
+                        <div class="empty-state">
+                            No actions available yet.
+                        </div>
+                    </div>
+
+                </div>
+
+
+                <div class="dashboard-card">
+
+                    <h3>
+                        Privacy Notes
+                    </h3>
+
+                    <div
+                        id="nutritionPrivacyNotes"
+                        class="nutrition-content"
+                    >
+                        <div class="empty-state">
+                            No privacy notes available.
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="dashboard-card">
+
+                <h3>
+                    Data Minimization
+                </h3>
+
+                <p id="nutritionMinimization">
+                    LockLens evaluates available metadata
+                    locally and avoids intentionally storing
+                    raw personal information.
                 </p>
 
-                <h2>
-                    Latest URL Risk Assessment
-                </h2>
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             CATEGORY INTELLIGENCE
+             ================================================= -->
+
+        <section
+            id="categoryIntelligenceSection"
+            class="dashboard-section"
+        >
+
+            <div class="section-header">
+
+                <div>
+
+                    <span class="section-label">
+                        CATEGORY INTELLIGENCE
+                    </span>
+
+                    <h2>
+                        Privacy Category Intelligence
+                    </h2>
+
+                    <p>
+                        Understand the sensitivity of each
+                        detected privacy domain.
+                    </p>
+
+                </div>
 
             </div>
 
-            <p>
-                Anonymous security indicators only.
-            </p>
-
-        </div>
-
-        <div class="url-dashboard-card">
-
-            <div class="url-dashboard-score">
-
-                <span>
-                    URL Risk
-                </span>
-
-                <strong id="dashboardURLScore">
-                    —
-                </strong>
-
-                <small id="dashboardURLLevel">
-                    Not analyzed
-                </small>
-
-            </div>
 
             <div
-                id="dashboardURLChecks"
-                class="url-dashboard-checks"
+                id="categoryIntelligence"
+                class="category-intelligence-grid"
             >
 
                 <div class="empty-state">
-                    No URL assessment yet.
+                    Analyze a page to generate
+                    category intelligence.
                 </div>
 
             </div>
 
-            <div
-                id="dashboardURLTime"
-                class="url-dashboard-time"
-            >
-                No URL assessment yet.
-            </div>
-
-        </div>
-
-    </section>
+        </section>
 
 
-    <!-- ==========================================
-         EXPLAINABLE RISK
-    =========================================== -->
 
-    <section class="dashboard-card">
+        <!-- =================================================
+             PRIVACY DECISION PATH
+             ================================================= -->
 
-        <div class="section-heading">
-
-            <div>
-
-                <p class="eyebrow">
-                    EXPLAINABLE SECURITY
-                </p>
-
-                <h2>
-                    Why This Risk?
-                </h2>
-
-            </div>
-
-            <p>
-                Transparent risk reasoning.
-            </p>
-
-        </div>
-
-        <div
-            id="dashboardExplanation"
-            class="dashboard-explanation"
+        <section
+            id="decisionPath"
+            class="dashboard-section"
         >
 
-            <div class="empty-state">
-                Run a LockLens scan to generate
-                an explanation.
-            </div>
+            <div class="section-header">
 
-        </div>
+                <div>
 
-    </section>
+                    <span class="section-label">
+                        DECISION SUPPORT
+                    </span>
 
+                    <h2>
+                        Privacy Decision Path
+                    </h2>
 
-    <!-- ==========================================
-         DETECTED CATEGORIES
-    =========================================== -->
+                    <p>
+                        A structured path that helps users
+                        understand detected privacy signals
+                        before deciding what to do.
+                    </p>
 
-    <section class="dashboard-card">
-
-        <div class="section-heading">
-
-            <div>
-
-                <p class="eyebrow">
-                    EXPOSURE SIGNALS
-                </p>
-
-                <h2>
-                    Detected Categories
-                </h2>
+                </div>
 
             </div>
 
-        </div>
-
-        <div
-            id="findingsList"
-            class="findings-list"
-        >
-
-            <div class="empty-state">
-                No exposure signals detected.
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <!-- ==========================================
-         PRIVACY GUARD
-    =========================================== -->
-
-    <section class="dashboard-card">
-
-        <div class="section-heading">
-
-            <div>
-
-                <p class="eyebrow">
-                    ACTIVE PROTECTION
-                </p>
-
-                <h2>
-                    Privacy Guard
-                </h2>
-
-            </div>
-
-        </div>
-
-        <div class="guard-dashboard">
 
             <div
-                id="guardStatus"
-                class="guard-status"
+                id="dashboardDecisionPath"
+                class="decision-path-container"
             >
-                Checking...
+
+                <div class="empty-state">
+                    Analyze a page from the LockLens popup
+                    to generate the Privacy Decision Path.
+                </div>
+
             </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             WHY THIS RISK
+             ================================================= -->
+
+        <section
+            id="explanationSection"
+            class="dashboard-section"
+        >
+
+            <div class="section-header">
+
+                <div>
+
+                    <span class="section-label">
+                        EXPLAINABLE RISK
+                    </span>
+
+                    <h2>
+                        Why This Risk?
+                    </h2>
+
+                    <p>
+                        Understand the signals contributing
+                        to the current risk score.
+                    </p>
+
+                </div>
+
+            </div>
+
 
             <div
-                id="guardLastResult"
-                class="guard-result"
+                id="explanation"
+                class="dashboard-card explanation-card"
             >
-                No recent guard assessment.
+
+                <div class="empty-state">
+                    Analyze a page to generate
+                    an explanation.
+                </div>
+
             </div>
 
-        </div>
-
-    </section>
+        </section>
 
 
-    <!-- ==========================================
-         TIMELINE
-    =========================================== -->
 
-    <section class="dashboard-card">
+        <!-- =================================================
+             EXPOSURE CATEGORIES
+             ================================================= -->
 
-        <div class="section-heading">
+        <section
+            id="categoriesSection"
+            class="dashboard-section"
+        >
+
+            <div class="section-header">
+
+                <div>
+
+                    <span class="section-label">
+                        DETECTION
+                    </span>
+
+                    <h2>
+                        Exposure Categories
+                    </h2>
+
+                    <p>
+                        Privacy-sensitive categories detected
+                        during the latest analysis.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="categories"
+                class="categories-grid"
+            >
+
+                <div class="empty-state">
+                    No privacy categories detected yet.
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             URL ASSESSMENT
+             ================================================= -->
+
+        <section
+            id="urlSection"
+            class="dashboard-section"
+        >
+
+            <div class="section-header">
+
+                <div>
+
+                    <span class="section-label">
+                        URL INSPECTOR
+                    </span>
+
+                    <h2>
+                        Latest URL Assessment
+                    </h2>
+
+                    <p>
+                        Structural URL signals detected
+                        during the latest analysis.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="urlAssessment"
+                class="dashboard-card assessment-card"
+            >
+
+                <div class="empty-state">
+                    No URL assessment available.
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             EMAIL ASSESSMENT
+             ================================================= -->
+
+        <section
+            id="emailSection"
+            class="dashboard-section"
+        >
+
+            <div class="section-header">
+
+                <div>
+
+                    <span class="section-label">
+                        EMAIL ANALYZER
+                    </span>
+
+                    <h2>
+                        Latest Email Assessment
+                    </h2>
+
+                    <p>
+                        Authentication and structural
+                        email-header signals.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="emailAssessment"
+                class="dashboard-card assessment-card"
+            >
+
+                <div class="empty-state">
+                    No email header analysis available.
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             RECOMMENDATIONS
+             ================================================= -->
+
+        <section
+            id="recommendationsSection"
+            class="dashboard-section"
+        >
+
+            <div class="section-header">
+
+                <div>
+
+                    <span class="section-label">
+                        PRIVACY COACH
+                    </span>
+
+                    <h2>
+                        Recommendations
+                    </h2>
+
+                    <p>
+                        Practical privacy guidance based on
+                        detected categories and risk signals.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="recommendations"
+                class="recommendations-grid"
+            >
+
+                <div class="empty-state">
+                    Recommendations will appear
+                    after analysis.
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             DIGITAL TIMELINE
+             ================================================= -->
+
+        <section
+            id="timelineSection"
+            class="dashboard-section"
+        >
+
+            <div class="section-header">
+
+                <div>
+
+                    <span class="section-label">
+                        LONG-TERM INSIGHTS
+                    </span>
+
+                    <h2>
+                        Digital Footprint Over Time
+                    </h2>
+
+                    <p>
+                        Anonymous local exposure metadata
+                        recorded by LockLens.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="timeline"
+                class="timeline-container"
+            >
+
+                <div class="empty-state">
+                    No exposure timeline events recorded yet.
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             PRIVACY GUARD
+             ================================================= -->
+
+        <section
+            id="guardSection"
+            class="dashboard-section"
+        >
+
+            <div class="section-header">
+
+                <div>
+
+                    <span class="section-label">
+                        PROACTIVE PROTECTION
+                    </span>
+
+                    <h2>
+                        Privacy Guard
+                    </h2>
+
+                    <p>
+                        Metadata-based warnings for
+                        privacy-sensitive forms.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="privacyGuard"
+                class="dashboard-card guard-card"
+            >
+
+                <div class="empty-state">
+                    Privacy Guard information
+                    is not available yet.
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             PRIVACY ARCHITECTURE
+             ================================================= -->
+
+        <section
+            id="architectureSection"
+            class="dashboard-section"
+        >
+
+            <div class="section-header">
+
+                <div>
+
+                    <span class="section-label">
+                        PRIVACY BY DESIGN
+                    </span>
+
+                    <h2>
+                        Privacy Architecture
+                    </h2>
+
+                    <p>
+                        How LockLens processes privacy
+                        information in the prototype.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="privacyArchitecture"
+                class="dashboard-card architecture-card"
+            >
+
+                <div class="architecture-flow">
+
+                    <div class="architecture-step">
+
+                        <strong>1</strong>
+
+                        <span>
+                            Browser
+                        </span>
+
+                    </div>
+
+
+                    <div class="architecture-arrow">
+                        →
+                    </div>
+
+
+                    <div class="architecture-step">
+
+                        <strong>2</strong>
+
+                        <span>
+                            Local Scanner
+                        </span>
+
+                    </div>
+
+
+                    <div class="architecture-arrow">
+                        →
+                    </div>
+
+
+                    <div class="architecture-step">
+
+                        <strong>3</strong>
+
+                        <span>
+                            Risk Engine
+                        </span>
+
+                    </div>
+
+
+                    <div class="architecture-arrow">
+                        →
+                    </div>
+
+
+                    <div class="architecture-step">
+
+                        <strong>4</strong>
+
+                        <span>
+                            Dashboard
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <p class="privacy-note">
+                    Core privacy analysis is designed to run
+                    locally in the browser. LockLens does not
+                    intentionally store raw passwords, typed
+                    personal values, or raw email headers.
+                </p>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             LOCAL DATA
+             ================================================= -->
+
+        <section
+            id="localDataSection"
+            class="dashboard-section"
+        >
+
+            <div class="section-header">
+
+                <div>
+
+                    <span class="section-label">
+                        DATA CONTROL
+                    </span>
+
+                    <h2>
+                        Local Data
+                    </h2>
+
+                    <p>
+                        Manage the analysis metadata stored
+                        locally by the prototype.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="localData"
+                class="dashboard-card local-data-card"
+            >
+
+                <div class="empty-state">
+                    Loading local data information...
+                </div>
+
+            </div>
+
+
+            <div class="danger-zone">
+
+                <div>
+
+                    <h3>
+                        Clear Local Analysis Data
+                    </h3>
+
+                    <p>
+                        This removes LockLens data stored in
+                        Chrome local storage for this extension.
+                    </p>
+
+                </div>
+
+
+                <button
+                    id="clearLocalData"
+                    class="danger-button"
+                >
+                    Clear Local Data
+                </button>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             FOOTER
+             ================================================= -->
+
+        <footer class="dashboard-footer">
 
             <div>
 
-                <p class="eyebrow">
-                    EXPOSURE HISTORY
-                </p>
+                <strong>
+                    LockLens
+                </strong>
 
-                <h2>
-                    Digital Footprint Over Time
-                </h2>
+                <span>
+                    Privacy Intelligence Prototype
+                </span>
 
             </div>
 
-        </div>
-
-        <div
-            id="timelineContainer"
-            class="timeline-container"
-        >
-
-            <div class="empty-state">
-                No timeline events yet.
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <!-- ==========================================
-         CATEGORY ANALYSIS
-    =========================================== -->
-
-    <section class="dashboard-card">
-
-        <div class="section-heading">
 
             <div>
 
-                <p class="eyebrow">
-                    CATEGORY ANALYSIS
-                </p>
+                <span>
+                    Local Processing
+                </span>
 
-                <h2>
-                    Exposure Categories
-                </h2>
+                <span>
+                    •
+                </span>
 
-            </div>
-
-        </div>
-
-        <div
-            id="categoryChart"
-            class="category-chart"
-        >
-
-            <div class="empty-state">
-                No category data available.
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <!-- ==========================================
-         RECOMMENDATIONS
-    =========================================== -->
-
-    <section class="dashboard-card">
-
-        <div class="section-heading">
-
-            <div>
-
-                <p class="eyebrow">
-                    PRIVACY GUIDANCE
-                </p>
-
-                <h2>
-                    Recommendations
-                </h2>
+                <span>
+                    No Raw Personal Data Storage
+                </span>
 
             </div>
 
-        </div>
+        </footer>
 
-        <div
-            id="recommendationsList"
-            class="recommendations-list"
-        >
-
-            <div class="empty-state">
-                No recommendations available.
-            </div>
-
-        </div>
-
-    </section>
+    </main>
 
 
-    <!-- ==========================================
-         LOCAL DATA
-    =========================================== -->
 
-    <section class="dashboard-card danger-zone">
+    <!-- =====================================================
+         JAVASCRIPT
+         ===================================================== -->
 
-        <div class="section-heading">
-
-            <div>
-
-                <p class="eyebrow">
-                    DATA CONTROL
-                </p>
-
-                <h2>
-                    Local Data
-                </h2>
-
-            </div>
-
-        </div>
-
-        <p>
-            LockLens stores anonymous scan results
-            locally in browser storage. Actual
-            personal values and analyzed URLs are
-            not stored.
-        </p>
-
-        <button
-            id="clearDataButton"
-            class="clear-button"
-        >
-            Clear Local LockLens Data
-        </button>
-
-    </section>
-
-
-    <footer class="dashboard-footer">
-
-        LockLens • Privacy-first digital
-        exposure protection
-
-    </footer>
-
-</div>
-
-<script src="dashboard.js"></script>
+    <script src="dashboard.js"></script>
 
 </body>
 
